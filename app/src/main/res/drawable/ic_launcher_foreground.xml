@@ -1,0 +1,44 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Outer Camera Lens Body -->
+    <path
+        android:fillColor="#282D38"
+        android:strokeColor="#3A404F"
+        android:strokeWidth="1.5"
+        android:pathData="M54,54m-28,0a28,28 0,1 1,56 0a28,28 0,1 1,-56 0" />
+
+    <!-- Sony Alpha Signature Orange Mount / Accent Ring -->
+    <path
+        android:strokeColor="#E85A19"
+        android:strokeWidth="2.5"
+        android:pathData="M54,54m-22,0a22,22 0,1 1,44 0a22,22 0,1 1,-44 0" />
+
+    <!-- Lens Element Deep Glass -->
+    <path
+        android:fillColor="#0E1015"
+        android:pathData="M54,54m-18,0a18,18 0,1 1,36 0a18,18 0,1 1,-36 0" />
+
+    <!-- Stylized Camera Aperture Blades & Alpha Geometry -->
+    <path
+        android:fillColor="#E85A19"
+        android:pathData="M54,40 L62,56 L46,56 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,44 L60,55 L48,55 Z" />
+
+    <!-- Lens Optical Reflection Arc (Cyan/Blue Tint) -->
+    <path
+        android:strokeColor="#3D82FF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M44,46 A14,14 0 0,1 64,46" />
+
+    <!-- Focus Sensor Center Dot -->
+    <path
+        android:fillColor="#00C896"
+        android:pathData="M54,54m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0" />
+</vector>

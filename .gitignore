@@ -1,0 +1,16 @@
+*.iml
+.gradle/
+.android/
+local.properties
+.idea/
+.DS_Store
+build/
+*/build/
+**/build/
+captures/
+.externalNativeBuild
+.cxx
+.sdk/
+*.apk
+*.aab
+core/heif/src/main/cpp/vendor/
