@@ -18,7 +18,8 @@ data class PtpImageMetadata(
     val formatCode: Int,
     val isHeif: Boolean,
     val isRaw: Boolean,
-    val captureDate: String
+    val captureDate: String,
+    val isContentCatalog: Boolean = false
 )
 
 class PtpIpClient {
@@ -30,11 +31,19 @@ class PtpIpClient {
 
     private val transactionMutex = Mutex()
 
-    suspend fun connect(cameraHost: String, port: Int = PtpConstants.PTP_IP_PORT) = withContext(Dispatchers.IO) {
-        // 1. Connect Command Socket
-        val cmd = Socket()
-        cmd.connect(InetSocketAddress(cameraHost, port), 5000)
-        cmd.soTimeout = 10000
+    suspend fun connect(
+        cameraHost: String,
+        port: Int = PtpConstants.PTP_IP_PORT,
+        network: android.net.Network? = null
+    ) = withContext(Dispatchers.IO) {
+        disconnect()
+
+        val socketFactory = network?.socketFactory ?: javax.net.SocketFactory.getDefault()
+
+        // 1. Connect Command Socket bound to camera Wi-Fi network (bypasses mobile 5G)
+        val cmd = socketFactory.createSocket()
+        cmd.connect(InetSocketAddress(cameraHost, port), 6000)
+        cmd.soTimeout = 15000
         cmdSocket = cmd
         cmdIn = cmd.getInputStream()
         cmdOut = cmd.getOutputStream()
@@ -52,10 +61,10 @@ class PtpIpClient {
 
         val connectionNumber = ByteBuffer.wrap(ackPayload).order(ByteOrder.LITTLE_ENDIAN).int
 
-        // 3. Connect Event Socket
-        val evt = Socket()
-        evt.connect(InetSocketAddress(cameraHost, port), 5000)
-        evt.soTimeout = 10000
+        // 3. Connect Event Socket bound to camera Wi-Fi network
+        val evt = socketFactory.createSocket()
+        evt.connect(InetSocketAddress(cameraHost, port), 6000)
+        evt.soTimeout = 15000
         eventSocket = evt
         val evtIn = evt.getInputStream()
         val evtOut = evt.getOutputStream()
@@ -66,7 +75,7 @@ class PtpIpClient {
         val (evtAckType, _) = readPacket(evtIn)
         require(evtAckType == PtpConstants.PKT_INIT_EVENT_ACK) { "Expected InitEventAck, got $evtAckType" }
 
-        // 5. Open Sony Extended Session (Mode 2 = Combined shooting and transfer for A6700)
+        // 5. Open Sony Extended Session (Mode 2 = Combined shooting and transfer for modern Sony cameras)
         executeCommand(PtpConstants.OC_SONY_OPEN_EXTENDED_SESSION, listOf(1L, 2L))
     }
 
@@ -80,11 +89,103 @@ class PtpIpClient {
         eventSocket = null
     }
 
+    suspend fun loadMediaList(): List<PtpImageMetadata> {
+        // Method 1: Try modern Sony Content Catalog (A6700, A7M4, A7R5, A7C2, ZV-E1)
+        try {
+            val catalogPhotos = fetchContentCatalog()
+            if (catalogPhotos.isNotEmpty()) {
+                return catalogPhotos
+            }
+        } catch (_: Exception) {}
+
+        // Method 2: Fallback to standard PTP Storage and Handles
+        val photos = mutableListOf<PtpImageMetadata>()
+        val storageIds = getStorageIds()
+        for (storage in storageIds) {
+            val handles = getObjectHandles(storage)
+            for (handle in handles) {
+                try {
+                    photos.add(getObjectInfo(handle))
+                } catch (_: Exception) {}
+            }
+        }
+        return photos
+    }
+
+    private suspend fun fetchContentCatalog(): List<PtpImageMetadata> {
+        // Enable content catalog transfer mode on Sony camera
+        try {
+            executeDataOut(
+                PtpConstants.OC_SONY_SET_PROPERTY,
+                listOf(PtpConstants.PROP_SONY_TRANSFER_MODE.toLong(), 1L),
+                byteArrayOf(2, 0)
+            )
+        } catch (_: Exception) {}
+
+        val allFiles = mutableListOf<PtpImageMetadata>()
+        var cursor = 0L
+
+        var pageCount = 0
+        while (pageCount++ < 50) {
+            val cursorLow = cursor and 0xFFFFFFFFL
+            val cursorHigh = cursor ushr 32
+            val data = executeDataIn(
+                PtpConstants.OC_SONY_GET_CONTENT_CATALOG,
+                listOf(cursorLow, cursorHigh, 100L, 1L, 0L),
+                limit = 2 * 1024 * 1024
+            )
+            if (data.isEmpty()) break
+
+            val batch = SonyContentParser.parse(data)
+            for (file in batch.files) {
+                allFiles.add(
+                    PtpImageMetadata(
+                        handle = file.handle,
+                        filename = file.name,
+                        fileSize = file.size,
+                        formatCode = file.formatCode,
+                        isHeif = file.isHeif,
+                        isRaw = file.isRaw,
+                        captureDate = file.date,
+                        isContentCatalog = true
+                    )
+                )
+            }
+            if (batch.timestamps.size < 100) break
+            val last = batch.timestamps.last()
+            if (last <= cursor) break
+            cursor = last + 1
+        }
+        return allFiles
+    }
+
+    suspend fun getThumbnail(metadata: PtpImageMetadata): ByteArray? {
+        return try {
+            if (metadata.isContentCatalog) {
+                val hLow = metadata.handle and 0xFFFFFFFFL
+                val hHigh = metadata.handle ushr 32
+                executeDataIn(
+                    PtpConstants.OC_SONY_GET_CONTENT_THUMB,
+                    listOf(hLow, hHigh, 1L),
+                    limit = 512 * 1024
+                )
+            } else {
+                executeDataIn(
+                    PtpConstants.OC_GET_THUMB,
+                    listOf(metadata.handle),
+                    limit = 512 * 1024
+                )
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     suspend fun executeCommand(opCode: Int, params: List<Long> = emptyList()): Int = transactionMutex.withLock {
         withContext(Dispatchers.IO) {
             val tId = transactionId++
             val payload = ByteBuffer.allocate(4 + 2 + 4 + params.size * 4).order(ByteOrder.LITTLE_ENDIAN)
-            payload.putInt(1) // Data phase info (1 = no data or data in)
+            payload.putInt(1)
             payload.putShort(opCode.toShort())
             payload.putInt(tId)
             params.forEach { payload.putInt(it.toInt()) }
@@ -99,7 +200,37 @@ class PtpIpClient {
         }
     }
 
-    suspend fun executeDataIn(opCode: Int, params: List<Long> = emptyList()): ByteArray = transactionMutex.withLock {
+    suspend fun executeDataOut(opCode: Int, params: List<Long>, data: ByteArray): Int = transactionMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val tId = transactionId++
+            val payload = ByteBuffer.allocate(4 + 2 + 4 + params.size * 4).order(ByteOrder.LITTLE_ENDIAN)
+            payload.putInt(2)
+            payload.putShort(opCode.toShort())
+            payload.putInt(tId)
+            params.forEach { payload.putInt(it.toInt()) }
+
+            sendPacket(cmdOut!!, PtpConstants.PKT_CMD_REQUEST, payload.array())
+
+            val startData = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+            startData.putInt(tId)
+            startData.putLong(data.size.toLong())
+            sendPacket(cmdOut!!, PtpConstants.PKT_START_DATA, startData.array())
+
+            val endData = ByteBuffer.allocate(4 + data.size).order(ByteOrder.LITTLE_ENDIAN)
+            endData.putInt(tId)
+            endData.put(data)
+            sendPacket(cmdOut!!, PtpConstants.PKT_END_DATA, endData.array())
+
+            val (respType, respPayload) = readPacket(cmdIn!!)
+            require(respType == PtpConstants.PKT_CMD_RESPONSE) { "Unexpected response type $respType" }
+
+            val respBuf = ByteBuffer.wrap(respPayload).order(ByteOrder.LITTLE_ENDIAN)
+            val respCode = respBuf.short.toInt() and 0xFFFF
+            respCode
+        }
+    }
+
+    suspend fun executeDataIn(opCode: Int, params: List<Long> = emptyList(), limit: Int = 8 * 1024 * 1024): ByteArray = transactionMutex.withLock {
         withContext(Dispatchers.IO) {
             val tId = transactionId++
             val payload = ByteBuffer.allocate(4 + 2 + 4 + params.size * 4).order(ByteOrder.LITTLE_ENDIAN)
@@ -116,20 +247,23 @@ class PtpIpClient {
                 when (type) {
                     PtpConstants.PKT_START_DATA -> {}
                     PtpConstants.PKT_DATA, PtpConstants.PKT_END_DATA -> {
-                        dataStream.addAll(bytes.toList())
-                        if (type == PtpConstants.PKT_END_DATA) break
+                        val dataOffset = if (bytes.size >= 4) 4 else 0
+                        for (i in dataOffset until bytes.size) {
+                            dataStream.add(bytes[i])
+                        }
+                        // DO NOT break on PKT_END_DATA! Must wait for PKT_CMD_RESPONSE to complete the transaction cleanly!
                     }
                     PtpConstants.PKT_CMD_RESPONSE -> {
+                        // The transaction is complete only when the camera sends response!
                         break
                     }
                 }
             }
-            // Read trailing response packet if needed
             dataStream.toByteArray()
         }
     }
 
-    suspend fun getStorageIds(): List<Long> {
+    private suspend fun getStorageIds(): List<Long> {
         val data = executeDataIn(PtpConstants.OC_GET_STORAGE_IDS)
         if (data.size < 4) return emptyList()
         val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
@@ -141,7 +275,7 @@ class PtpIpClient {
         return ids
     }
 
-    suspend fun getObjectHandles(storageId: Long): List<Long> {
+    private suspend fun getObjectHandles(storageId: Long): List<Long> {
         val data = executeDataIn(PtpConstants.OC_GET_OBJECT_HANDLES, listOf(storageId, 0L, 0L))
         if (data.size < 4) return emptyList()
         val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
@@ -153,16 +287,14 @@ class PtpIpClient {
         return handles
     }
 
-    suspend fun getObjectInfo(handle: Long): PtpImageMetadata {
+    private suspend fun getObjectInfo(handle: Long): PtpImageMetadata {
         val data = executeDataIn(PtpConstants.OC_GET_OBJECT_INFO, listOf(handle))
         val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
-        buf.int // StorageId
+        buf.int
         val formatCode = buf.short.toInt() and 0xFFFF
-        buf.short // ProtectionStatus
+        buf.short
         val size = buf.int.toLong() and 0xFFFFFFFFL
 
-        // Skip to filename string
-        // Filename is a PTP Unicode String after fixed fields
         val filename = "DSC" + String.format("%05d", handle % 100000) + when (formatCode) {
             PtpConstants.FMT_SONY_HEIF -> ".HIF"
             PtpConstants.FMT_SONY_ARW -> ".ARW"
@@ -176,18 +308,31 @@ class PtpIpClient {
             formatCode = formatCode,
             isHeif = formatCode == PtpConstants.FMT_SONY_HEIF,
             isRaw = formatCode == PtpConstants.FMT_SONY_ARW,
-            captureDate = "2026:10:25 14:30:00"
+            captureDate = "2026:10:25",
+            isContentCatalog = false
         )
     }
 
-    suspend fun readPartialObject(handle: Long, offset: Long, length: Int): ByteArray {
-        // Sony 0x9201 GetPartialLargeObject: parameters are (handle, offset_low, offset_high, length)
-        val offsetLow = offset and 0xFFFFFFFFL
-        val offsetHigh = offset ushr 32
-        return executeDataIn(
-            PtpConstants.OC_SONY_GET_PARTIAL_LARGE_OBJECT,
-            listOf(handle, offsetLow, offsetHigh, length.toLong())
-        )
+    suspend fun readPartialObject(metadata: PtpImageMetadata, offset: Long, length: Int): ByteArray {
+        return if (metadata.isContentCatalog) {
+            val hLow = metadata.handle and 0xFFFFFFFFL
+            val hHigh = metadata.handle ushr 32
+            val offLow = offset and 0xFFFFFFFFL
+            val offHigh = offset ushr 32
+            executeDataIn(
+                PtpConstants.OC_SONY_READ_CONTENT_OBJECT,
+                listOf(hLow, hHigh, offLow, offHigh, length.toLong()),
+                limit = length + 64
+            )
+        } else {
+            val offsetLow = offset and 0xFFFFFFFFL
+            val offsetHigh = offset ushr 32
+            executeDataIn(
+                PtpConstants.OC_SONY_GET_PARTIAL_LARGE_OBJECT,
+                listOf(metadata.handle, offsetLow, offsetHigh, length.toLong()),
+                limit = length + 64
+            )
+        }
     }
 
     private fun sendPacket(out: OutputStream, type: Int, payload: ByteArray) {

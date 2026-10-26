@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,6 +33,7 @@ fun CameraGalleryScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val thumbnails by viewModel.thumbnails.collectAsState()
     var isMultiSelectMode by remember { mutableStateOf(false) }
     val selectedHandles = remember { mutableStateListOf<Long>() }
     var showExportSheet by remember { mutableStateOf(false) }
@@ -233,9 +235,11 @@ fun CameraGalleryScreen(
 
                             PhotoGridCell(
                                 photo = photo,
+                                thumbnail = thumbnails[photo.handle],
                                 isSelected = isSelected,
                                 isSelectMode = isMultiSelectMode,
                                 downloadProgress = progress,
+                                onRequestThumbnail = { viewModel.requestThumbnail(photo) },
                                 onClick = {
                                     if (isMultiSelectMode) {
                                         if (isSelected) selectedHandles.remove(photo.handle) else selectedHandles.add(photo.handle)
@@ -275,11 +279,19 @@ fun CameraGalleryScreen(
 @Composable
 private fun PhotoGridCell(
     photo: PtpImageMetadata,
+    thumbnail: android.graphics.Bitmap?,
     isSelected: Boolean,
     isSelectMode: Boolean,
     downloadProgress: Float?,
+    onRequestThumbnail: () -> Unit,
     onClick: () -> Unit
 ) {
+    LaunchedEffect(photo.handle) {
+        if (thumbnail == null) {
+            onRequestThumbnail()
+        }
+    }
+
     Surface(
         modifier = Modifier
             .aspectRatio(1f)
@@ -289,13 +301,22 @@ private fun PhotoGridCell(
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Rounded.Image,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                    modifier = Modifier.size(36.dp)
+            if (thumbnail != null) {
+                androidx.compose.foundation.Image(
+                    bitmap = thumbnail.asImageBitmap(),
+                    contentDescription = photo.filename,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
                 )
+            } else {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Rounded.Image,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
             }
 
             Surface(

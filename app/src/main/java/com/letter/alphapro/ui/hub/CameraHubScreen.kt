@@ -86,7 +86,9 @@ fun CameraHubScreen(
                     showScanDialog = true
                     viewModel.startScan(sonyOnly = true)
                 },
-                onDisconnect = { viewModel.disconnectCamera() }
+                onDisconnect = { viewModel.disconnectCamera() },
+                onReconnect = { viewModel.reconnectCamera() },
+                onForgetDevice = { viewModel.forgetDevice() }
             )
 
             Text(
@@ -165,7 +167,9 @@ private fun DynamicCameraHeroCard(
     pairedAddress: String?,
     bleState: SonyBleConnectionState,
     onPairNewDevice: () -> Unit,
-    onDisconnect: () -> Unit
+    onDisconnect: () -> Unit,
+    onReconnect: () -> Unit,
+    onForgetDevice: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -183,11 +187,12 @@ private fun DynamicCameraHeroCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val statusColor = when (bleState) {
                         is SonyBleConnectionState.Ready -> CameraActiveGreen
-                        is SonyBleConnectionState.Connecting, is SonyBleConnectionState.Handshaking -> CameraWarningAmber
+                        is SonyBleConnectionState.Pairing, is SonyBleConnectionState.Connecting, is SonyBleConnectionState.Handshaking -> CameraWarningAmber
                         else -> MaterialTheme.colorScheme.outline
                     }
                     val statusText = when (bleState) {
                         is SonyBleConnectionState.Ready -> "蓝牙已联机 · 正在打卡"
+                        is SonyBleConnectionState.Pairing -> "正在配对..."
                         is SonyBleConnectionState.Connecting -> "正在连接..."
                         is SonyBleConnectionState.Handshaking -> "鉴权校准中..."
                         is SonyBleConnectionState.DiscoveringServices -> "发现服务中..."
@@ -209,8 +214,52 @@ private fun DynamicCameraHeroCard(
                 }
 
                 if (pairedAddress != null) {
-                    TextButton(onClick = onDisconnect) {
-                        Text("断开连接", style = MaterialTheme.typography.labelSmall)
+                    val isConnected = bleState is SonyBleConnectionState.Ready
+                    val isConnecting = bleState is SonyBleConnectionState.Connecting ||
+                                       bleState is SonyBleConnectionState.DiscoveringServices ||
+                                       bleState is SonyBleConnectionState.Handshaking ||
+                                       bleState is SonyBleConnectionState.Pairing
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (isConnected) {
+                            OutlinedButton(
+                                onClick = onDisconnect,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Text("断开连接", style = MaterialTheme.typography.labelSmall)
+                            }
+                        } else if (!isConnecting) {
+                            Button(
+                                onClick = onReconnect,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Icon(Icons.Rounded.BluetoothConnected, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("重新连接", style = MaterialTheme.typography.labelSmall)
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = onDisconnect,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Text("取消", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+
+                        IconButton(onClick = onForgetDevice, modifier = Modifier.size(30.dp)) {
+                            Icon(
+                                imageVector = Icons.Rounded.DeleteOutline,
+                                contentDescription = "解除配对",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }

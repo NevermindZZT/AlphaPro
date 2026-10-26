@@ -29,7 +29,7 @@ class PtpPhotoDownloader(
     private val client: PtpIpClient
 ) {
     companion object {
-        const val CHUNK_SIZE = 1024 * 1024 // 1 MB chunks
+        const val CHUNK_SIZE = 512 * 1024 // 512 KB chunks
     }
 
     fun downloadToMediaStore(
@@ -115,7 +115,7 @@ class PtpPhotoDownloader(
 
         while (offset < total) {
             val length = minOf(CHUNK_SIZE.toLong(), total - offset).toInt()
-            val chunk = client.readPartialObject(metadata.handle, offset, length)
+            val chunk = client.readPartialObject(metadata, offset, length)
             outputStream.write(chunk)
             offset += chunk.size
             onProgress(offset)

@@ -7,6 +7,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.letter.alphapro.AlphaProApplication
 import com.letter.alphapro.core.bluetooth.*
 import com.letter.alphapro.core.ftp.EmbeddedFtpServer
 import com.letter.alphapro.core.ftp.TetherIncomingPhoto
@@ -47,7 +48,7 @@ data class CameraUiState(
 
 class CameraViewModel(application: Application) : AndroidViewModel(application) {
     val prefs = CameraPreferences(application)
-    val gattManager = SonyBleGattManager(application, viewModelScope)
+    val gattManager = (application as AlphaProApplication).gattManager
     val shutterController = SonyRemoteShutterController(gattManager)
     val wifiConnector = CameraWifiSpecifierConnector(application)
     val ptpClient = PtpIpClient()
@@ -67,6 +68,24 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private var scanJob: Job? = null
     private var bulbJob: Job? = null
     private var intervalJob: Job? = null
+
+    val thumbnailCache = mutableMapOf<Long, android.graphics.Bitmap>()
+    private val _thumbnailsFlow = MutableStateFlow<Map<Long, android.graphics.Bitmap>>(emptyMap())
+    val thumbnails: StateFlow<Map<Long, android.graphics.Bitmap>> = _thumbnailsFlow.asStateFlow()
+
+    fun requestThumbnail(metadata: PtpImageMetadata) {
+        if (thumbnailCache.containsKey(metadata.handle)) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val bytes = ptpClient.getThumbnail(metadata)
+            if (bytes != null && bytes.isNotEmpty()) {
+                val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                if (bitmap != null) {
+                    thumbnailCache[metadata.handle] = bitmap
+                    _thumbnailsFlow.update { it + (metadata.handle to bitmap) }
+                }
+            }
+        }
+    }
 
     private val _uiState = MutableStateFlow(
         CameraUiState(
@@ -145,6 +164,18 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.copy(bleState = SonyBleConnectionState.Disconnected) }
     }
 
+    fun reconnectCamera() {
+        val address = prefs.pairedDeviceAddress ?: return
+        val name = prefs.pairedDeviceName ?: "Sony Camera"
+        connectCamera(address, name)
+    }
+
+    fun forgetDevice() {
+        disconnectCamera()
+        prefs.clearPairedDevice()
+        _uiState.update { it.copy(pairedAddress = null, pairedName = null) }
+    }
+
     fun toggleGpsSync(enabled: Boolean) {
         prefs.isGpsAutoSyncEnabled = enabled
         _uiState.update { it.copy(isGpsSyncActive = enabled) }
@@ -182,12 +213,12 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
 
             _uiState.update { it.copy(userNotice = "正在直连相机 Wi-Fi: " + credentials.ssid) }
 
-            wifiConnector.connectCameraWifi(credentials.ssid, credentials.password)
+            wifiConnector.connectCameraWifi(credentials.ssid, credentials.password, credentials.bssid)
                 .collect { wifiState ->
                     _uiState.update { it.copy(wifiState = wifiState) }
                     if (wifiState is CameraWifiState.Connected) {
                         _uiState.update { it.copy(userNotice = "Wi-Fi 直连成功，正在读取存储卡...") }
-                        loadCameraMedia(wifiState.gatewayIp)
+                        loadCameraMedia(wifiState.gatewayIp, wifiState.network)
                     }
                 }
         }
@@ -207,24 +238,20 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun loadCameraMedia(gatewayIp: String = "192.168.122.1") {
+    fun loadCameraMedia(
+        gatewayIp: String = "192.168.122.1",
+        network: android.net.Network? = (_uiState.value.wifiState as? CameraWifiState.Connected)?.network
+    ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isMediaLoading = true) }
             try {
-                ptpClient.connect(gatewayIp)
-                val storageIds = ptpClient.getStorageIds()
-                val photos = mutableListOf<PtpImageMetadata>()
-                for (storage in storageIds) {
-                    val handles = ptpClient.getObjectHandles(storage)
-                    for (handle in handles) {
-                        photos.add(ptpClient.getObjectInfo(handle))
-                    }
-                }
+                ptpClient.connect(cameraHost = gatewayIp, network = network)
+                val photos = ptpClient.loadMediaList()
                 _uiState.update {
                     it.copy(
                         mediaItems = photos.reversed(), // Latest first
                         isMediaLoading = false,
-                        userNotice = "已载入 " + photos.size.toString() + " 张照片"
+                        userNotice = if (photos.isNotEmpty()) "已载入 " + photos.size.toString() + " 张机内照片" else "存储卡内暂无照片"
                     )
                 }
             } catch (e: Exception) {
@@ -357,7 +384,6 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         super.onCleared()
         ftpServer.stop()
         wifiConnector.release()
-        gattManager.disconnect()
         stopScan()
     }
 }

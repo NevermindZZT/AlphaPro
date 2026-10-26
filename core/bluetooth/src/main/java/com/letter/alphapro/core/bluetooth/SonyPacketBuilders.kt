@@ -6,16 +6,39 @@ import java.util.Calendar
 import java.util.TimeZone
 import kotlin.math.abs
 
-object SonyLocationPacketBuilder {
-    private val FIXED_HEADER = byteArrayOf(
-        0x00, 0x5D, 0x08, 0x02, 0xFC.toByte(), 0x03, 0x00, 0x00, 0x10, 0x10, 0x10
+data class LocationDataConfig(
+    val shouldSendTimeZoneAndDst: Boolean = true
+) {
+    val dataSize: Int = if (shouldSendTimeZoneAndDst) 95 else 91
+
+    val fixedBytes: ByteArray = byteArrayOf(
+        0x00,
+        if (shouldSendTimeZoneAndDst) 0x5D else 0x59,
+        0x08,
+        0x02,
+        0xFC.toByte(),
+        if (shouldSendTimeZoneAndDst) 0x03 else 0x00,
+        0x00,
+        0x00,
+        0x10,
+        0x10,
+        0x10
     )
+
+    companion object {
+        fun hasTimeZoneDstFlag(value: ByteArray): Boolean {
+            return value.size >= 5 && (value[4].toInt() and 0x02) != 0
+        }
+    }
+}
+
+object SonyLocationPacketBuilder {
     private const val PADDING_SIZE = 65
-    const val TOTAL_PACKET_SIZE = 95
 
     fun build(
         latitude: Double,
         longitude: Double,
+        config: LocationDataConfig = LocationDataConfig(shouldSendTimeZoneAndDst = true),
         epochMillis: Long = System.currentTimeMillis(),
         timeZone: TimeZone = TimeZone.getDefault()
     ): ByteArray {
@@ -33,16 +56,8 @@ object SonyLocationPacketBuilder {
         val latInt = (latitude * 10_000_000).toInt()
         val lngInt = (longitude * 10_000_000).toInt()
 
-        // Offsets in minutes
-        val rawOffsetMinutes = (timeZone.rawOffset / 60_000).toShort()
-        val dstOffsetMinutes = if (timeZone.inDaylightTime(calendar.time)) {
-            (timeZone.dstSavings / 60_000).toShort()
-        } else {
-            0.toShort()
-        }
-
-        val buffer = ByteBuffer.allocate(TOTAL_PACKET_SIZE).order(ByteOrder.BIG_ENDIAN)
-        buffer.put(FIXED_HEADER)
+        val buffer = ByteBuffer.allocate(config.dataSize).order(ByteOrder.BIG_ENDIAN)
+        buffer.put(config.fixedBytes)
         buffer.putInt(latInt)
         buffer.putInt(lngInt)
 
@@ -54,8 +69,17 @@ object SonyLocationPacketBuilder {
         buffer.put(second)
 
         buffer.put(ByteArray(PADDING_SIZE))
-        buffer.putShort(rawOffsetMinutes)
-        buffer.putShort(dstOffsetMinutes)
+
+        if (config.shouldSendTimeZoneAndDst) {
+            val rawOffsetMinutes = (timeZone.rawOffset / 60_000).toShort()
+            val dstOffsetMinutes = if (timeZone.inDaylightTime(calendar.time)) {
+                (timeZone.dstSavings / 60_000).toShort()
+            } else {
+                0.toShort()
+            }
+            buffer.putShort(rawOffsetMinutes)
+            buffer.putShort(dstOffsetMinutes)
+        }
 
         return buffer.array()
     }
@@ -98,5 +122,38 @@ object SonyTimeSyncPacketBuilder {
         packet[12] = offsetRemainderMinutes.toByte()
 
         return packet
+    }
+}
+
+object SonyWifiDataParser {
+    /**
+     * Sony cameras prepend a 3-byte header to the SSID and password.
+     */
+    fun parsePrefixedAscii(value: ByteArray): String? {
+        return if (value.size > 3) parseAscii(value.copyOfRange(3, value.size)) else null
+    }
+
+    fun parseAscii(value: ByteArray): String? {
+        if (value.isEmpty() || value.any { it.toInt() !in 32..126 }) return null
+        return value.map { it.toInt().toChar() }.joinToString("")
+    }
+
+    /**
+     * CC09 type 1: Wi-Fi state (0 off, 1 starting, 2 on, 3 stopping), error code.
+     */
+    fun parseWifiStatus(value: ByteArray): Pair<Int, Int>? {
+        var offset = 0
+        while (offset < value.size) {
+            val length = value[offset].toInt() and 0xff
+            if (length < 2 || offset + length + 1 > value.size) return null
+            val type = ((value[offset + 1].toInt() and 0xff) shl 8) or (value[offset + 2].toInt() and 0xff)
+            if (type == 1 && length >= 4) {
+                val state = value[offset + 3].toInt() and 0xff
+                val error = value[offset + 4].toInt() and 0xff
+                return Pair(state, error)
+            }
+            offset += length + 1
+        }
+        return null
     }
 }

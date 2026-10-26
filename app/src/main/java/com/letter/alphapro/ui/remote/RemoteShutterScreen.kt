@@ -49,6 +49,13 @@ fun RemoteShutterScreen(
 
     val isBleReady = uiState.bleState is SonyBleConnectionState.Ready
 
+    LaunchedEffect(isBleReady) {
+        if (isBleReady) {
+            // Send wake-up probe to wake camera remote receiver
+            viewModel.halfPressAfUp()
+        }
+    }
+
     Scaffold(
         modifier = modifier,
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),

@@ -52,6 +52,22 @@ class FusedLocationSource(private val context: Context) : LocationSource {
             }
         }
 
+        // Immediately send cached last location so camera gets instant GPS fix upon connection
+        fusedClient.lastLocation.addOnSuccessListener { loc ->
+            if (loc != null) {
+                trySend(
+                    GeoCoordinate(
+                        latitude = loc.latitude,
+                        longitude = loc.longitude,
+                        altitude = loc.altitude,
+                        accuracy = loc.accuracy,
+                        speed = loc.speed,
+                        timestamp = loc.time
+                    )
+                )
+            }
+        }
+
         fusedClient.requestLocationUpdates(request, callback, Looper.getMainLooper())
 
         awaitClose {

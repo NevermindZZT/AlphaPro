@@ -11,10 +11,10 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import com.letter.alphapro.AlphaProApplication
 import com.letter.alphapro.core.bluetooth.SonyBleConnectionState
 import com.letter.alphapro.core.bluetooth.SonyBleGattManager
 import com.letter.alphapro.core.location.AdaptiveLocationEngine
-import com.letter.alphapro.core.location.FusedLocationSource
 import com.letter.alphapro.core.location.GpxTrackLogger
 import kotlinx.coroutines.*
 import java.io.File
@@ -32,16 +32,16 @@ class LocationSenderForegroundService : Service() {
     private lateinit var gpxLogger: GpxTrackLogger
 
     private var activeJob: Job? = null
+    private var lastSentCoordinate: Pair<Double, Double>? = null
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
 
-        gattManager = SonyBleGattManager(applicationContext, serviceScope)
-        val locationSource = FusedLocationSource(applicationContext)
-        locationEngine = AdaptiveLocationEngine(locationSource)
-        val gpxDir = File(getExternalFilesDir(null), "tracks").apply { mkdirs() }
-        gpxLogger = GpxTrackLogger(gpxDir)
+        val app = AlphaProApplication.instance
+        gattManager = app.gattManager
+        locationEngine = app.locationEngine
+        gpxLogger = app.gpxLogger
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -66,10 +66,12 @@ class LocationSenderForegroundService : Service() {
     private fun startLocationTransmissionLoop() {
         activeJob?.cancel()
         activeJob = serviceScope.launch {
+            // 1. Observe connection state for notifications
             launch {
                 gattManager.connectionState.collect { state ->
                     val statusText = when (state) {
                         is SonyBleConnectionState.Ready -> "已联机 ${state.deviceName} · 正在同步 GPS"
+                        is SonyBleConnectionState.Pairing -> "正在进行系统蓝牙配对..."
                         is SonyBleConnectionState.Connecting -> "正在连接相机..."
                         is SonyBleConnectionState.DiscoveringServices -> "正在发现服务..."
                         is SonyBleConnectionState.Handshaking -> "正在进行鉴权与时钟校准..."
@@ -82,11 +84,27 @@ class LocationSenderForegroundService : Service() {
                 }
             }
 
+            // 2. Collect location updates from engine
             launch {
                 locationEngine.getFilteredLocationUpdates().collect { coord ->
                     gpxLogger.recordPoint(coord)
+                    lastSentCoordinate = Pair(coord.latitude, coord.longitude)
                     if (gattManager.connectionState.value is SonyBleConnectionState.Ready) {
                         gattManager.sendLocation(coord.latitude, coord.longitude)
+                    }
+                }
+            }
+
+            // 3. MANDATORY 5-second periodic heartbeat loop!
+            // Sony cameras have a 10s watchdog timer: if no location packet is received within ~10s,
+            // the camera switches back to the prohibited GPS icon!
+            launch {
+                while (isActive) {
+                    delay(5000)
+                    lastSentCoordinate?.let { (lat, lng) ->
+                        if (gattManager.connectionState.value is SonyBleConnectionState.Ready) {
+                            gattManager.sendLocation(lat, lng)
+                        }
                     }
                 }
             }
@@ -96,7 +114,6 @@ class LocationSenderForegroundService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
-        gattManager.disconnect()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

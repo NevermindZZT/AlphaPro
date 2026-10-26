@@ -33,7 +33,12 @@ object PtpConstants {
     // Extended Sony & MTP Operations
     const val OC_SONY_SDIO_CONNECT = 0x9201
     const val OC_SONY_GET_PARTIAL_LARGE_OBJECT = 0x9201
+    const val OC_SONY_SET_PROPERTY = 0x9207
+    const val PROP_SONY_TRANSFER_MODE = 0xD30F
     const val OC_SONY_OPEN_EXTENDED_SESSION = 0x9210
+    const val OC_SONY_GET_CONTENT_CATALOG = 0x923C
+    const val OC_SONY_READ_CONTENT_OBJECT = 0x923D
+    const val OC_SONY_GET_CONTENT_THUMB = 0x923E
     const val OC_MTP_GET_OBJECT_PROP_LIST = 0x9805
 
     // PTP Response Codes
