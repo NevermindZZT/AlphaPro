@@ -8,11 +8,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
+import com.letter.alphapro.data.AppThemeMode
 import com.letter.alphapro.ui.navigation.AlphaProApp
 import com.letter.alphapro.ui.theme.AlphaProTheme
+import com.letter.alphapro.viewmodel.CameraViewModel
 
 class MainActivity : ComponentActivity() {
+
+    private val viewModel: CameraViewModel by viewModels()
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -24,8 +32,20 @@ class MainActivity : ComponentActivity() {
         requestRequiredPermissions()
 
         setContent {
-            AlphaProTheme {
-                AlphaProApp()
+            val themeMode by viewModel.themeMode.collectAsState()
+            val dynamicColor by viewModel.dynamicColor.collectAsState()
+
+            val isDark = when (themeMode) {
+                AppThemeMode.FOLLOW_SYSTEM -> isSystemInDarkTheme()
+                AppThemeMode.LIGHT -> false
+                AppThemeMode.DARK -> true
+            }
+
+            AlphaProTheme(
+                darkTheme = isDark,
+                dynamicColor = dynamicColor
+            ) {
+                AlphaProApp(viewModel = viewModel)
             }
         }
     }

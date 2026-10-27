@@ -427,6 +427,74 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         return null
     }
 
+    // Unified App Settings StateFlows
+    private val _themeMode = MutableStateFlow(prefs.themeMode)
+    val themeMode: StateFlow<com.letter.alphapro.data.AppThemeMode> = _themeMode.asStateFlow()
+
+    private val _dynamicColor = MutableStateFlow(prefs.isDynamicColorEnabled)
+    val dynamicColor: StateFlow<Boolean> = _dynamicColor.asStateFlow()
+
+    private val _gpsInterval = MutableStateFlow(prefs.gpsInterval)
+    val gpsInterval: StateFlow<com.letter.alphapro.data.GpsInterval> = _gpsInterval.asStateFlow()
+
+    private val _isGpxLogging = MutableStateFlow(prefs.isGpxTrackLoggingEnabled)
+    val isGpxLogging: StateFlow<Boolean> = _isGpxLogging.asStateFlow()
+
+    private val _heifPolicy = MutableStateFlow(prefs.defaultHeifPolicy)
+    val heifPolicy: StateFlow<com.letter.alphapro.data.DefaultHeifPolicy> = _heifPolicy.asStateFlow()
+
+    private val _jpegQuality = MutableStateFlow(prefs.defaultJpegQuality)
+    val jpegQuality: StateFlow<Int> = _jpegQuality.asStateFlow()
+
+    private val _autoWake = MutableStateFlow(prefs.autoWakeOnCameraPowerOn)
+    val autoWake: StateFlow<Boolean> = _autoWake.asStateFlow()
+
+    fun setThemeMode(mode: com.letter.alphapro.data.AppThemeMode) {
+        prefs.themeMode = mode
+        _themeMode.value = mode
+    }
+
+    fun setDynamicColor(enabled: Boolean) {
+        prefs.isDynamicColorEnabled = enabled
+        _dynamicColor.value = enabled
+    }
+
+    fun setGpsInterval(interval: com.letter.alphapro.data.GpsInterval) {
+        prefs.gpsInterval = interval
+        _gpsInterval.value = interval
+    }
+
+    fun setGpxLogging(enabled: Boolean) {
+        prefs.isGpxTrackLoggingEnabled = enabled
+        _isGpxLogging.value = enabled
+    }
+
+    fun setHeifPolicy(policy: com.letter.alphapro.data.DefaultHeifPolicy) {
+        prefs.defaultHeifPolicy = policy
+        _heifPolicy.value = policy
+    }
+
+    fun setJpegQuality(quality: Int) {
+        prefs.defaultJpegQuality = quality
+        _jpegQuality.value = quality
+    }
+
+    fun setAutoWake(enabled: Boolean) {
+        prefs.autoWakeOnCameraPowerOn = enabled
+        _autoWake.value = enabled
+        val address = prefs.pairedDeviceAddress
+        if (address != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                val cdm = getApplication<Application>().getSystemService(android.companion.CompanionDeviceManager::class.java)
+                if (enabled) {
+                    cdm?.startObservingDevicePresence(address)
+                } else {
+                    cdm?.stopObservingDevicePresence(address)
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         ftpServer.stop()

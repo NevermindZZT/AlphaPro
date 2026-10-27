@@ -65,6 +65,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.settings.SettingsActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
         <!-- Companion Device Service for System-level Camera Wakeup -->
         <service
             android:name=".service.CameraCompanionService"

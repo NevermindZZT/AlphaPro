@@ -32,6 +32,7 @@ fun CameraHubScreen(
     viewModel: CameraViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val discoveredCameras by viewModel.discoveredCameras.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
@@ -61,6 +62,12 @@ fun CameraHubScreen(
                         viewModel.startScan(sonyOnly = true)
                     }) {
                         Icon(Icons.Rounded.BluetoothSearching, contentDescription = "搜索配对相机")
+                    }
+                    IconButton(onClick = {
+                        val intent = android.content.Intent(context, com.letter.alphapro.ui.settings.SettingsActivity::class.java)
+                        context.startActivity(intent)
+                    }) {
+                        Icon(Icons.Rounded.Settings, contentDescription = "设置")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
