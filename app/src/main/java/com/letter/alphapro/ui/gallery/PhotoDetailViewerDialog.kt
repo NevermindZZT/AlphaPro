@@ -4,223 +4,142 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.ZoomOutMap
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.letter.alphapro.core.ptp.CameraCaptureGroup
-import com.letter.alphapro.ui.theme.AlphaBlueSecondary
-import com.letter.alphapro.ui.theme.AlphaOrangePrimary
+import kotlin.math.min
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** A full-size Activity-root destination, never a Dialog or nested Scaffold. */
 @Composable
-fun PhotoDetailViewerDialog(
+fun PhotoDetailViewerScreen(
     group: CameraCaptureGroup,
     thumbnail: Bitmap?,
+    preview: PhotoPreviewState,
+    onRetry: () -> Unit,
     onDismissRequest: () -> Unit,
     onDownloadClick: (CameraCaptureGroup) -> Unit
 ) {
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
+    val handle = group.visualFile.handle
+    val current = preview.takeIf { it.handle == handle }
+    val large = current?.bitmap
+    val bitmap = large ?: thumbnail
+    var scale by remember(handle) { mutableFloatStateOf(1f) }
+    var offset by remember(handle) { mutableStateOf(Offset.Zero) }
+    var viewport by remember(handle) { mutableStateOf(IntSize.Zero) }
 
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+    Box(
+        Modifier.fillMaxSize().background(Color.Black)
+            .semantics { paneTitle = "照片查看器" }
+            .pointerInput(Unit) {
+                // Standard nested gesture handling: block background taps without consuming
+                // motion events that belong to child buttons or the pinch/drag viewport.
+                detectTapGestures(onTap = {})
+            }
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-        ) {
-            // Main Zoomable Photo View
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            scale = (scale * zoom).coerceIn(1f, 5f)
-                            if (scale > 1f) {
-                                val maxOffsetX = (size.width * (scale - 1)) / 2
-                                val maxOffsetY = (size.height * (scale - 1)) / 2
-                                offsetX = (offsetX + pan.x * scale).coerceIn(-maxOffsetX, maxOffsetX)
-                                offsetY = (offsetY + pan.y * scale).coerceIn(-maxOffsetY, maxOffsetY)
-                            } else {
-                                offsetX = 0f
-                                offsetY = 0f
-                            }
-                        }
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                if (thumbnail != null) {
-                    Image(
-                        bitmap = thumbnail.asImageBitmap(),
-                        contentDescription = group.baseName,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer(
-                                scaleX = scale,
-                                scaleY = scale,
-                                translationX = offsetX,
-                                translationY = offsetY
-                            )
-                    )
-                } else {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                        Text(
-                            text = "正在载入高清预览...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                    }
-                }
-            }
-
-            // Top Control Bar
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding(),
-                color = Color.Black.copy(alpha = 0.6f)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onDismissRequest) {
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = "关闭",
-                            tint = Color.White
-                        )
-                    }
-
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = group.baseName,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            ),
-                            color = Color.White
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = when {
-                                    group.hasRaw && group.hasHeif -> AlphaOrangePrimary
-                                    group.hasRaw -> AlphaBlueSecondary
-                                    group.hasHeif -> AlphaOrangePrimary
-                                    else -> MaterialTheme.colorScheme.surfaceVariant
-                                }
-                            ) {
-                                Text(
-                                    text = group.badgeLabel,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = Color.White
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = group.captureDate,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.7f)
-                            )
-                        }
-                    }
-
-                    // Reset Zoom button
+        BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+            val metadataLimit = minOf(144.dp, maxHeight * 0.25f)
+            Column(Modifier.fillMaxSize()) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text(group.baseName, Modifier.weight(1f).padding(horizontal = 8.dp),
+                        color = Color.White, fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (scale > 1f) {
-                        IconButton(onClick = { scale = 1f; offsetX = 0f; offsetY = 0f }) {
-                            Icon(
-                                imageVector = Icons.Rounded.ZoomOutMap,
-                                contentDescription = "还原缩放",
-                                tint = Color.White
-                            )
+                        IconButton(onClick = { scale = 1f; offset = Offset.Zero }) {
+                            Icon(Icons.Rounded.ZoomOutMap, "还原缩放", tint = Color.White)
                         }
-                    } else {
-                        Spacer(modifier = Modifier.width(48.dp))
+                    }
+                    IconButton(onClick = onDismissRequest) {
+                        Icon(Icons.Rounded.Close, "关闭", tint = Color.White)
                     }
                 }
-            }
-
-            // Bottom Action Bar
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding(),
-                color = Color.Black.copy(alpha = 0.75f)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        val sizeText = String.format("%.1f MB", group.totalSizeMb)
-                        Text(
-                            text = if (group.isDualFormat) "双格式总大小: " + sizeText else "大小: " + sizeText,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color.White.copy(alpha = 0.85f)
-                        )
-                        Text(
-                            text = if (group.isDualFormat) "包含 RAW 与高质量渲染图" else "单格式图像",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
-                        )
+                val fit = if (bitmap != null && viewport.width > 0 && viewport.height > 0) {
+                    min(viewport.width.toFloat() / bitmap.width, viewport.height.toFloat() / bitmap.height)
+                } else 0f
+                val fittedWidth = (bitmap?.width ?: 0) * fit
+                val fittedHeight = (bitmap?.height ?: 0) * fit
+                fun clamp(value: Offset, zoom: Float): Offset {
+                    val x = ((fittedWidth * zoom - viewport.width) / 2).coerceAtLeast(0f)
+                    val y = ((fittedHeight * zoom - viewport.height) / 2).coerceAtLeast(0f)
+                    return Offset(value.x.coerceIn(-x, x), value.y.coerceIn(-y, y))
+                }
+                val visibleOffset = clamp(offset, scale)
+                Box(Modifier.fillMaxWidth().weight(1f).clipToBounds()
+                    .onSizeChanged { viewport = it }
+                    .pointerInput(handle, bitmap, viewport) {
+                        if (bitmap != null) detectTransformGestures { centroid, pan, zoom, _ ->
+                            val next = (scale * zoom).coerceIn(1f, 5f)
+                            val focus = centroid - Offset(size.width / 2f, size.height / 2f)
+                            offset = clamp((clamp(offset, scale) - focus) * (next / scale) + focus + pan, next)
+                            scale = next
+                        }
+                    }, contentAlignment = Alignment.Center) {
+                    if (bitmap != null) {
+                        Image(remember(bitmap) { bitmap.asImageBitmap() }, group.baseName,
+                            Modifier.fillMaxSize().graphicsLayer {
+                                scaleX = scale; scaleY = scale
+                                translationX = visibleOffset.x; translationY = visibleOffset.y
+                            }, contentScale = ContentScale.Fit)
+                    } else Text(if (current?.isLoading == true) "正在获取预览…" else "暂无可用预览",
+                        color = Color.White.copy(alpha = 0.75f))
+                }
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Only metadata scrolls. The export button is always outside this scroller.
+                    Column(Modifier.fillMaxWidth().heightIn(max = metadataLimit)
+                        .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(when {
+                            large != null -> current?.sourceLabel ?: "相机预览 · "+large.width+" × "+large.height
+                            thumbnail != null -> "低分辨率缩略图 · "+thumbnail.width+" × "+thumbnail.height
+                            else -> "尚未加载预览"
+                        }, color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
+                        if (current?.isLoading == true) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                                Text("正在载入…", Modifier.padding(start = 8.dp), color = Color.White,
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        if (current?.error != null || (current?.isLoading != true && large == null)) {
+                            Text(current?.error ?: "相机预览不可用", color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall)
+                            TextButton(onClick = onRetry, enabled = current?.isLoading != true) { Text("重试预览", color = Color.White) }
+                        }
+                        Text(group.badgeLabel + group.captureDate.takeIf { it.isNotBlank() }?.let { " · "+it }.orEmpty(),
+                            color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall)
+                        Text((if (group.isDualFormat) "双格式总大小: " else "大小: ")+String.format("%.1f MB", group.totalSizeMb),
+                            color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
                     }
-
-                    Button(
-                        onClick = { onDownloadClick(group) },
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Download,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (group.isDualFormat) "下载 / 导出" else "导出照片",
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
-                        )
+                    Button(onClick = { onDownloadClick(group) }, Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(12.dp)) {
+                        Icon(Icons.Rounded.Download, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (group.isDualFormat) "下载 / 导出" else "导出照片")
                     }
                 }
             }

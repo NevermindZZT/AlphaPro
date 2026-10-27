@@ -34,6 +34,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by viewModel.themeMode.collectAsState()
             val dynamicColor by viewModel.dynamicColor.collectAsState()
+            val viewingPhoto by viewModel.viewingPhoto.collectAsState()
 
             val isDark = when (themeMode) {
                 AppThemeMode.FOLLOW_SYSTEM -> isSystemInDarkTheme()
@@ -43,7 +44,8 @@ class MainActivity : ComponentActivity() {
 
             AlphaProTheme(
                 darkTheme = isDark,
-                dynamicColor = dynamicColor
+                dynamicColor = dynamicColor,
+                photoViewerVisible = viewingPhoto != null
             ) {
                 AlphaProApp(viewModel = viewModel)
             }

@@ -63,6 +63,7 @@ private val LightColorScheme = lightColorScheme(
 fun AlphaProTheme(
     darkTheme: Boolean = isSystemInDarkTheme(), // Follows system theme by default
     dynamicColor: Boolean = true,
+    photoViewerVisible: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -82,8 +83,17 @@ fun AlphaProTheme(
                 val insetsController = WindowCompat.getInsetsController(window, view)
                 // In dark theme, status bar text should be light (isAppearanceLightStatusBars = false)
                 // In light theme, status bar text should be dark (isAppearanceLightStatusBars = true)
-                insetsController.isAppearanceLightStatusBars = !darkTheme
-                insetsController.isAppearanceLightNavigationBars = !darkTheme
+                insetsController.isAppearanceLightStatusBars = !(darkTheme || photoViewerVisible)
+                insetsController.isAppearanceLightNavigationBars = !(darkTheme || photoViewerVisible)
+                // System bars belong to the Activity root viewer, not a floating Dialog.
+                @Suppress("DEPRECATION")
+                window.statusBarColor = android.graphics.Color.TRANSPARENT
+                @Suppress("DEPRECATION")
+                window.navigationBarColor = android.graphics.Color.TRANSPARENT
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    window.isStatusBarContrastEnforced = false
+                    window.isNavigationBarContrastEnforced = !photoViewerVisible
+                }
             }
         }
     }

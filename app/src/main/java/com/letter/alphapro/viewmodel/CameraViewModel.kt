@@ -84,23 +84,25 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private var bulbJob: Job? = null
     private var intervalJob: Job? = null
 
-    val thumbnailCache = mutableMapOf<Long, android.graphics.Bitmap>()
-    private val _thumbnailsFlow = MutableStateFlow<Map<Long, android.graphics.Bitmap>>(emptyMap())
-    val thumbnails: StateFlow<Map<Long, android.graphics.Bitmap>> = _thumbnailsFlow.asStateFlow()
-
-    fun requestThumbnail(metadata: PtpImageMetadata) {
-        if (thumbnailCache.containsKey(metadata.handle)) return
-        viewModelScope.launch(Dispatchers.IO) {
-            val bytes = ptpClient.getThumbnail(metadata)
-            if (bytes != null && bytes.isNotEmpty()) {
-                val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                if (bitmap != null) {
-                    thumbnailCache[metadata.handle] = bitmap
-                    _thumbnailsFlow.update { it + (metadata.handle to bitmap) }
-                }
-            }
-        }
+    private val photoLoader = com.letter.alphapro.ui.gallery.CameraPhotoLoader(ptpClient, viewModelScope)
+    val thumbnails = photoLoader.thumbnails
+    val photoPreview = photoLoader.preview
+    val thumbnailErrors = photoLoader.thumbnailErrors
+    private val _viewingPhoto = MutableStateFlow<com.letter.alphapro.core.ptp.CameraCaptureGroup?>(null)
+    val viewingPhoto = _viewingPhoto.asStateFlow()
+    fun openPhoto(group: com.letter.alphapro.core.ptp.CameraCaptureGroup) {
+        _viewingPhoto.value = group
+        photoLoader.showPreview(group.visualFile)
     }
+    fun closePhoto() {
+        _viewingPhoto.value = null
+        photoLoader.clearPreview()
+    }
+    fun retryThumbnail(metadata: PtpImageMetadata) = photoLoader.retryThumbnail(metadata)
+    fun releaseThumbnailRequest(handle: Long) = photoLoader.releaseThumbnailRequest(handle)
+    fun requestThumbnail(metadata: PtpImageMetadata) = photoLoader.requestThumbnail(metadata)
+    fun requestPhotoPreview(metadata: PtpImageMetadata) = photoLoader.showPreview(metadata)
+    fun clearPhotoPreview() = photoLoader.clearPreview()
 
     private val _uiState = MutableStateFlow(
         CameraUiState(
@@ -296,6 +298,8 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
             wifiJob?.cancelAndJoin()
             wifiJob = null
             wifiConnector.release()
+            closePhoto()
+            photoLoader.reset()
             ptpClient.disconnect()
             _uiState.update { it.copy(wifiState = CameraWifiState.Idle, mediaItems = emptyList(), userNotice = "Wi-Fi 已断开") }
         }
@@ -306,6 +310,8 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         network: android.net.Network? = (_uiState.value.wifiState as? CameraWifiState.Connected)?.network
     ) {
         viewModelScope.launch {
+            closePhoto()
+            photoLoader.reset()
             _uiState.update { it.copy(isMediaLoading = true) }
             try {
                 ptpClient.connect(cameraHost = gatewayIp, network = network)

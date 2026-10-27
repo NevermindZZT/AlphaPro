@@ -49,9 +49,9 @@ object SonyContentParser {
             val contentId = number(4)
             take(20) // Directory, file, group type/id
             val created = number(8)
-            val modified = number(8)
-            val localCreated = number(8)
-            number(8)
+            number(8) // Modified (not the capture date)
+            val localCreated = number(8) // Camera-local wallclock, epoch milliseconds
+            number(8) // Local modified
             timestamps += created
             take(8) // Rating, protection flag
             val dummy = number(4) != 0L
@@ -86,7 +86,7 @@ object SonyContentParser {
                         formatCode = format,
                         isHeif = isHeif,
                         isRaw = isRaw,
-                        date = "2026:10:25",
+                        date = CameraPhotoDate.fromSonyLocalCreated(localCreated),
                         created = created
                     )
                 }
@@ -99,6 +99,8 @@ data class CameraCaptureGroup(
     val baseName: String,
     val files: List<PtpImageMetadata>
 ) {
+    val id: String get() = captureIdentity(files.first())
+
     val visualFile: PtpImageMetadata
         get() = files.firstOrNull { !it.isRaw && !it.isHeif }
             ?: files.firstOrNull { it.isHeif }
@@ -125,10 +127,18 @@ data class CameraCaptureGroup(
         get() = files.sumOf { it.fileSize } / (1024.0 * 1024.0)
 
     val filename: String get() = visualFile.filename
-    val captureDate: String get() = visualFile.captureDate
+    val captureDate: String get() = CameraPhotoDate.normalize(visualFile.captureDate)
+}
+
+private fun captureIdentity(file: PtpImageMetadata): String = if (file.isContentCatalog) {
+    // fileId occupies bits32..47; slot + contentId identify the same exposure across formats.
+    "content:" + (file.handle ushr 56) + ":" + (file.handle and 0xffffffffL)
+} else {
+    "name:" + file.storageId + ":" + file.parentHandle + ":" + file.filename.substringBeforeLast('.') + ":" + file.captureDate
 }
 
 fun List<PtpImageMetadata>.toCaptureGroups(): List<CameraCaptureGroup> {
-    return this.groupBy { it.filename.substringBeforeLast('.') }
-        .map { (name, list) -> CameraCaptureGroup(name, list) }
+    return groupBy(::captureIdentity).values.map { files ->
+        CameraCaptureGroup(files.first().filename.substringBeforeLast('.'), files)
+    }
 }
