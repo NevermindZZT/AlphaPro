@@ -241,20 +241,18 @@ class PtpIpClient {
 
             sendPacket(cmdOut!!, PtpConstants.PKT_CMD_REQUEST, payload.array())
 
-            val dataStream = mutableListOf<Byte>()
+            val dataStream = java.io.ByteArrayOutputStream()
             while (true) {
                 val (type, bytes) = readPacket(cmdIn!!)
                 when (type) {
                     PtpConstants.PKT_START_DATA -> {}
                     PtpConstants.PKT_DATA, PtpConstants.PKT_END_DATA -> {
                         val dataOffset = if (bytes.size >= 4) 4 else 0
-                        for (i in dataOffset until bytes.size) {
-                            dataStream.add(bytes[i])
+                        if (bytes.size > dataOffset) {
+                            dataStream.write(bytes, dataOffset, bytes.size - dataOffset)
                         }
-                        // DO NOT break on PKT_END_DATA! Must wait for PKT_CMD_RESPONSE to complete the transaction cleanly!
                     }
                     PtpConstants.PKT_CMD_RESPONSE -> {
-                        // The transaction is complete only when the camera sends response!
                         break
                     }
                 }

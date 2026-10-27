@@ -2,6 +2,7 @@ package com.letter.alphapro.ui.remote
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -102,6 +103,31 @@ fun RemoteShutterScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            // Sony Camera Remote Control Setup Hint Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "相机设置要求：请确认相机菜单 [网络] -> [Bluetooth] -> [Bluetooth遥控] 已设置为 [开]。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             // Mode Selector
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 RemoteShootingMode.entries.forEachIndexed { index, mode ->
@@ -134,22 +160,11 @@ fun RemoteShutterScreen(
                             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                             .border(
                                 6.dp,
-                                if (isAfPressed) CameraActiveGreen else MaterialTheme.colorScheme.outlineVariant,
+                                if (isBleReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                                 CircleShape
                             )
-                            .pointerInput(isBleReady) {
-                                if (isBleReady) {
-                                    detectTapGestures(
-                                        onPress = {
-                                            isAfPressed = true
-                                            viewModel.halfPressAfDown()
-                                            tryAwaitRelease()
-                                            isAfPressed = false
-                                            viewModel.halfPressAfUp()
-                                            viewModel.takePhoto()
-                                        }
-                                    )
-                                }
+                            .clickable(enabled = isBleReady) {
+                                viewModel.takePhoto()
                             },
                         contentAlignment = Alignment.Center
                     ) {
@@ -158,13 +173,13 @@ fun RemoteShutterScreen(
                                 imageVector = Icons.Rounded.Camera,
                                 contentDescription = null,
                                 modifier = Modifier.size(54.dp),
-                                tint = if (isAfPressed) CameraActiveGreen else if (isBleReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                tint = if (isBleReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = if (!isBleReady) "请先连接相机" else if (isAfPressed) "AF 对焦中" else "按下拍照",
+                                text = if (!isBleReady) "请先连接相机" else "按下拍照",
                                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = if (isAfPressed) CameraActiveGreen else MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }

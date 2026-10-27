@@ -344,6 +344,13 @@ class SonyBleGattManager(
 
     suspend fun readWifiCredentials(): SonyWifiCredentials? = gattMutex.withLock {
         val gatt = bluetoothGatt ?: return@withLock null
+
+        // Ensure services are populated
+        if (gatt.services.isNullOrEmpty()) {
+            gatt.discoverServices()
+            delay(800)
+        }
+
         val wifiPower = findCharacteristic(gatt, SonyBleConstants.CHAR_WIFI_POWER_UUID) ?: return@withLock null
         val wifiSsid = findCharacteristic(gatt, SonyBleConstants.CHAR_WIFI_SSID_UUID) ?: return@withLock null
         val wifiPwd = findCharacteristic(gatt, SonyBleConstants.CHAR_WIFI_PASSWORD_UUID) ?: return@withLock null
@@ -405,7 +412,27 @@ class SonyBleGattManager(
     suspend fun sendRemoteCommand(command: ByteArray): Boolean {
         val gatt = bluetoothGatt ?: return false
         val char = findCharacteristic(gatt, SonyBleConstants.CHAR_REMOTE_COMMAND_UUID) ?: return false
-        return writeCharacteristic(char, command)
+
+        // For remote shutter commands, always use WRITE_TYPE_NO_RESPONSE if available for zero-latency execution
+        val writeType = if (char.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0) {
+            BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+        } else {
+            BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+        }
+
+        return gattMutex.withLock {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val res = gatt.writeCharacteristic(char, command, writeType)
+                res == BluetoothStatusCodes.SUCCESS
+            } else {
+                @Suppress("DEPRECATION")
+                char.value = command
+                @Suppress("DEPRECATION")
+                char.writeType = writeType
+                @Suppress("DEPRECATION")
+                gatt.writeCharacteristic(char)
+            }
+        }
     }
 
     private suspend fun writeCharacteristic(

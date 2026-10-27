@@ -14,19 +14,25 @@ class SonyRemoteShutterController(
     }
 
     suspend fun takePhoto(): Boolean {
-        // Sony Shutter Sequence: Half-press AF -> Full-press Shutter -> Full release -> Half release
+        // Complete Sony two-stage shutter sequence:
+        // 1. Half-press down (locks focus)
         gattManager.sendRemoteCommand(SonyBleConstants.CMD_HALF_SHUTTER_DOWN)
         delay(150)
-        val fullDown = gattManager.sendRemoteCommand(SonyBleConstants.CMD_FULL_SHUTTER_DOWN)
-        delay(120)
+        // 2. Full-press down (triggers exposure while half-press is held!)
+        val down = gattManager.sendRemoteCommand(SonyBleConstants.CMD_FULL_SHUTTER_DOWN)
+        delay(150)
+        // 3. Release full-press
         gattManager.sendRemoteCommand(SonyBleConstants.CMD_FULL_SHUTTER_UP)
-        delay(60)
+        delay(50)
+        // 4. Release half-press
         gattManager.sendRemoteCommand(SonyBleConstants.CMD_HALF_SHUTTER_UP)
-        return fullDown
+        return down
     }
 
     suspend fun toggleMovieRecording(): Boolean {
-        return gattManager.sendRemoteCommand(SonyBleConstants.CMD_MOVIE_REC_TOGGLE)
+        gattManager.sendRemoteCommand(SonyBleConstants.CMD_MOVIE_REC_DOWN)
+        delay(150)
+        return gattManager.sendRemoteCommand(SonyBleConstants.CMD_MOVIE_REC_UP)
     }
 
     suspend fun startBulb(): Boolean {
@@ -37,7 +43,7 @@ class SonyRemoteShutterController(
 
     suspend fun stopBulb(): Boolean {
         gattManager.sendRemoteCommand(SonyBleConstants.CMD_FULL_SHUTTER_UP)
-        delay(60)
+        delay(50)
         return gattManager.sendRemoteCommand(SonyBleConstants.CMD_HALF_SHUTTER_UP)
     }
 

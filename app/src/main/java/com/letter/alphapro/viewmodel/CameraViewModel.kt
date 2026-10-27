@@ -151,6 +151,14 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.copy(pairedAddress = address, pairedName = name) }
         stopScan()
 
+        // Register companion device presence observation so Android OS auto-wakes app when camera turns on
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                val cdm = getApplication<Application>().getSystemService(android.companion.CompanionDeviceManager::class.java)
+                cdm?.startObservingDevicePresence(address)
+            } catch (_: Exception) {}
+        }
+
         gattManager.connect(address)
 
         if (prefs.isGpsAutoSyncEnabled) {
@@ -171,6 +179,13 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun forgetDevice() {
+        val address = prefs.pairedDeviceAddress
+        if (address != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                val cdm = getApplication<Application>().getSystemService(android.companion.CompanionDeviceManager::class.java)
+                cdm?.stopObservingDevicePresence(address)
+            } catch (_: Exception) {}
+        }
         disconnectCamera()
         prefs.clearPairedDevice()
         _uiState.update { it.copy(pairedAddress = null, pairedName = null) }
@@ -202,7 +217,13 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     fun connectCameraWifi() {
         viewModelScope.launch {
             _uiState.update { it.copy(userNotice = "正在通过蓝牙获取相机 Wi-Fi 凭证...") }
-            val credentials = gattManager.readWifiCredentials()
+            var credentials = gattManager.readWifiCredentials()
+
+            // If BLE read timed out or failed, fall back to previously saved credentials
+            if (credentials == null && !prefs.lastWifiSsid.isNullOrEmpty() && !prefs.lastWifiPassword.isNullOrEmpty()) {
+                credentials = SonyWifiCredentials(prefs.lastWifiSsid!!, prefs.lastWifiPassword!!)
+            }
+
             if (credentials == null) {
                 _uiState.update { it.copy(userNotice = "无法获取相机 Wi-Fi 凭证，请确认相机蓝牙已连接并在菜单中开启网络连接") }
                 return@launch
@@ -213,11 +234,11 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
 
             _uiState.update { it.copy(userNotice = "正在直连相机 Wi-Fi: " + credentials.ssid) }
 
-            wifiConnector.connectCameraWifi(credentials.ssid, credentials.password, credentials.bssid)
+            wifiConnector.connectCameraWifi(credentials.ssid, credentials.password)
                 .collect { wifiState ->
                     _uiState.update { it.copy(wifiState = wifiState) }
                     if (wifiState is CameraWifiState.Connected) {
-                        _uiState.update { it.copy(userNotice = "Wi-Fi 直连成功，正在读取存储卡...") }
+                        _uiState.update { it.copy(userNotice = "Wi-Fi 直连成功，正在读取机内照片...") }
                         loadCameraMedia(wifiState.gatewayIp, wifiState.network)
                     }
                 }

@@ -54,7 +54,11 @@ object SonyBleConstants {
     val CMD_HALF_SHUTTER_UP = byteArrayOf(0x01, 0x06)   // Release AF
     val CMD_AF_ON_DOWN = byteArrayOf(0x01, 0x15)
     val CMD_AF_ON_UP = byteArrayOf(0x01, 0x14)
+    val CMD_MOVIE_REC_DOWN = byteArrayOf(0x01, 0x0F)
+    val CMD_MOVIE_REC_UP = byteArrayOf(0x01, 0x0E)
     val CMD_MOVIE_REC_TOGGLE = byteArrayOf(0x01, 0x0E)
+    val CMD_C1_DOWN = byteArrayOf(0x01, 0x21)
+    val CMD_C1_UP = byteArrayOf(0x01, 0x20)
 
     // Remote Status Notifications from FF02
     val STATUS_READY = byteArrayOf(0x02, 0xA0.toByte(), 0x00)
