@@ -99,12 +99,19 @@ class LocationSenderForegroundService : Service() {
             // Sony cameras have a 10s watchdog timer: if no location packet is received within ~10s,
             // the camera switches back to the prohibited GPS icon!
             launch {
+                var lastGpxFlushTime = System.currentTimeMillis()
                 while (isActive) {
                     delay(5000)
                     lastSentCoordinate?.let { (lat, lng) ->
                         if (gattManager.connectionState.value is SonyBleConnectionState.Ready) {
                             gattManager.sendLocation(lat, lng)
                         }
+                    }
+
+                    // Flush GPX track to disk every 60 seconds
+                    if (System.currentTimeMillis() - lastGpxFlushTime > 60_000L) {
+                        lastGpxFlushTime = System.currentTimeMillis()
+                        gpxLogger.flush()
                     }
                 }
             }
@@ -113,6 +120,7 @@ class LocationSenderForegroundService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        gpxLogger.flush()
         serviceScope.cancel()
     }
 

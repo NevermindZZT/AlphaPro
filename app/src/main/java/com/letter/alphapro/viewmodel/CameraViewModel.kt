@@ -58,6 +58,19 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
 
     private val ftpStorageDir = File(application.getExternalFilesDir(null), "tether_ftp").apply { mkdirs() }
     val ftpServer = EmbeddedFtpServer(ftpStorageDir, 2121, viewModelScope)
+    val gpxLogger = (application as AlphaProApplication).gpxLogger
+
+    fun getGpxTrackDirectoryPath(): String {
+        return gpxLogger.storageDir.absolutePath
+    }
+
+    fun getGpxPointCount(): Int {
+        return gpxLogger.pointCount
+    }
+
+    fun flushAndGetGpxFile(): File? {
+        return gpxLogger.flush() ?: gpxLogger.getLatestTrackFile()
+    }
 
     private val _discoveredCameras = MutableStateFlow<List<DiscoveredCamera>>(emptyList())
     val discoveredCameras: StateFlow<List<DiscoveredCamera>> = _discoveredCameras.asStateFlow()

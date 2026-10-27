@@ -24,7 +24,15 @@ class AlphaProApplication : Application(), ImageLoaderFactory {
         gattManager = SonyBleGattManager(this)
         val locationSource = FusedLocationSource(this)
         locationEngine = AdaptiveLocationEngine(locationSource)
-        val gpxDir = File(getExternalFilesDir(null), "tracks").apply { mkdirs() }
+        val publicDocs = File(
+            android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOCUMENTS),
+            "AlphaPro/Tracks"
+        )
+        val gpxDir = if (publicDocs.exists() || publicDocs.mkdirs()) {
+            publicDocs
+        } else {
+            File(getExternalFilesDir(null), "tracks").apply { mkdirs() }
+        }
         gpxLogger = GpxTrackLogger(gpxDir)
     }
 

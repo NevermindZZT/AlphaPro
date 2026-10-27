@@ -29,11 +29,14 @@ class AdaptiveLocationEngine(
     }
 }
 
-class GpxTrackLogger(private val storageDir: File) {
+class GpxTrackLogger(val storageDir: File) {
     private val trackPoints = Collections.synchronizedList(mutableListOf<GeoCoordinate>())
     private val isoDateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
         timeZone = TimeZone.getTimeZone("UTC")
     }
+    private val dayDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+    val pointCount: Int get() = trackPoints.size
 
     fun recordPoint(coord: GeoCoordinate) {
         trackPoints.add(coord)
@@ -56,13 +59,26 @@ class GpxTrackLogger(private val storageDir: File) {
         }
     }
 
+    fun flush(): File? {
+        if (trackPoints.isEmpty()) return null
+        if (!storageDir.exists()) storageDir.mkdirs()
+        val dayStr = dayDateFormat.format(Date())
+        val fileName = "Track_$dayStr.gpx"
+        return exportToGpx(fileName)
+    }
+
     fun exportToGpx(fileName: String = "Track_${System.currentTimeMillis()}.gpx"): File {
+        if (!storageDir.exists()) storageDir.mkdirs()
         val file = File(storageDir, fileName)
         FileWriter(file).use { writer ->
             writer.write("""<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="AlphaPro Camera" xmlns="http://www.topografix.com/GPX/1/1">
-  <trk>
+  <metadata>
     <name>AlphaPro Camera Track</name>
+    <time>${isoDateFormat.format(Date())}</time>
+  </metadata>
+  <trk>
+    <name>AlphaPro Track ${file.nameWithoutExtension}</name>
     <trkseg>
 """)
             synchronized(trackPoints) {
@@ -80,5 +96,11 @@ class GpxTrackLogger(private val storageDir: File) {
 </gpx>""")
         }
         return file
+    }
+
+    fun getLatestTrackFile(): File? {
+        if (!storageDir.exists()) return null
+        return storageDir.listFiles { f -> f.isFile && f.name.endsWith(".gpx", ignoreCase = true) }
+            ?.maxByOrNull { it.lastModified() }
     }
 }
