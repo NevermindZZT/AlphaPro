@@ -1,5 +1,6 @@
 package com.letter.alphapro.ui.gallery
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,11 +17,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.letter.alphapro.core.ptp.CameraCaptureGroup
 import com.letter.alphapro.core.ptp.PtpImageMetadata
+import com.letter.alphapro.core.ptp.toCaptureGroups
 import com.letter.alphapro.ui.theme.AlphaBlueSecondary
 import com.letter.alphapro.ui.theme.AlphaOrangePrimary
 import com.letter.alphapro.viewmodel.CameraViewModel
@@ -35,24 +39,33 @@ fun CameraGalleryScreen(
     val uiState by viewModel.uiState.collectAsState()
     val thumbnails by viewModel.thumbnails.collectAsState()
     var isMultiSelectMode by remember { mutableStateOf(false) }
-    val selectedHandles = remember { mutableStateListOf<Long>() }
-    var showExportSheet by remember { mutableStateOf(false) }
+    val selectedGroupIds = remember { mutableStateListOf<String>() }
     var filterType by remember { mutableStateOf(0) } // 0: 全部, 1: HEIF, 2: RAW
+
+    // Viewer and Dialog states
+    var viewingGroup by remember { mutableStateOf<CameraCaptureGroup?>(null) }
+    var downloadingGroup by remember { mutableStateOf<CameraCaptureGroup?>(null) }
+    var showBatchExportSheet by remember { mutableStateOf(false) }
 
     val isWifiConnected = uiState.wifiState is CameraWifiState.Connected
     val isWifiConnecting = uiState.wifiState is CameraWifiState.Connecting
 
-    val filteredPhotos = remember(filterType, uiState.mediaItems) {
+    // Group RAW + HIF/JPEG by base capture name
+    val captureGroups = remember(uiState.mediaItems) {
+        uiState.mediaItems.toCaptureGroups()
+    }
+
+    val filteredGroups = remember(filterType, captureGroups) {
         when (filterType) {
-            1 -> uiState.mediaItems.filter { it.isHeif }
-            2 -> uiState.mediaItems.filter { it.isRaw }
-            else -> uiState.mediaItems
+            1 -> captureGroups.filter { it.hasHeif }
+            2 -> captureGroups.filter { it.hasRaw }
+            else -> captureGroups
         }
     }
 
     Scaffold(
         modifier = modifier,
-        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = {
@@ -62,7 +75,7 @@ fun CameraGalleryScreen(
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                         )
                         Text(
-                            text = if (isWifiConnected) "已载入 " + uiState.mediaItems.size.toString() + " 项媒体" else "Wi-Fi 未连接",
+                            text = if (isWifiConnected) "已载入 " + captureGroups.size.toString() + " 组照片 (" + uiState.mediaItems.size.toString() + " 个文件)" else "Wi-Fi 未连接",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -75,7 +88,7 @@ fun CameraGalleryScreen(
                         }
                         IconButton(onClick = {
                             isMultiSelectMode = !isMultiSelectMode
-                            if (!isMultiSelectMode) selectedHandles.clear()
+                            if (!isMultiSelectMode) selectedGroupIds.clear()
                         }) {
                             Icon(
                                 imageVector = if (isMultiSelectMode) Icons.Rounded.Close else Icons.Rounded.Checklist,
@@ -87,7 +100,7 @@ fun CameraGalleryScreen(
             )
         },
         bottomBar = {
-            if (isMultiSelectMode && selectedHandles.isNotEmpty()) {
+            if (isMultiSelectMode && selectedGroupIds.isNotEmpty()) {
                 Surface(
                     tonalElevation = 8.dp,
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -102,28 +115,31 @@ fun CameraGalleryScreen(
                     ) {
                         Column {
                             Text(
-                                text = "已选中 " + selectedHandles.size.toString() + " 项",
+                                text = "已选中 " + selectedGroupIds.size.toString() + " 组照片",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                             )
-                            val hasHeif = uiState.mediaItems.any { it.handle in selectedHandles && it.isHeif }
+                            val selectedGroups = captureGroups.filter { it.baseName in selectedGroupIds }
+                            val dualCount = selectedGroups.count { it.isDualFormat }
                             Text(
-                                text = if (hasHeif) "包含 10-bit HEIF 图像" else "RAW / JPEG 图像",
+                                text = if (dualCount > 0) "包含 " + dualCount.toString() + " 组 RAW+渲染图" else "单格式图像",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick = {
-                                val selectedPhotos = uiState.mediaItems.filter { it.handle in selectedHandles }
-                                selectedPhotos.forEach { photo ->
-                                    viewModel.exportPhoto(photo, transcodeToJpeg = false)
+                                val selected = captureGroups.filter { it.baseName in selectedGroupIds }
+                                selected.forEach { group ->
+                                    group.files.forEach { file ->
+                                        viewModel.exportPhoto(file, transcodeToJpeg = false)
+                                    }
                                 }
                                 isMultiSelectMode = false
-                                selectedHandles.clear()
+                                selectedGroupIds.clear()
                             }) {
                                 Text("原图直出")
                             }
-                            Button(onClick = { showExportSheet = true }) {
+                            Button(onClick = { showBatchExportSheet = true }) {
                                 Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("智能导出")
@@ -161,7 +177,7 @@ fun CameraGalleryScreen(
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                         )
                         Text(
-                            text = "浏览机内照片并导出 10-bit HEIF 需要高速 Wi-Fi 通道。点击下方按钮即可由蓝牙自动协商免密直连相机 Wi-Fi。",
+                            text = "浏览机内照片并导出 10-bit HEIF / RAW 需要高速 Wi-Fi 通道。点击下方按钮即可由蓝牙免密直连相机 Wi-Fi。",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 20.dp)
@@ -191,7 +207,7 @@ fun CameraGalleryScreen(
                         Text(text = "正在通过 PTP/IP 读取存储卡照片...", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
-            } else if (filteredPhotos.isEmpty()) {
+            } else if (filteredGroups.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(imageVector = Icons.Rounded.PhotoLibrary, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
@@ -209,17 +225,17 @@ fun CameraGalleryScreen(
                         FilterChip(
                             selected = filterType == 0,
                             onClick = { filterType = 0 },
-                            label = { Text("全部 (" + uiState.mediaItems.size.toString() + ")") }
+                            label = { Text("全部 (" + captureGroups.size.toString() + ")") }
                         )
                         FilterChip(
                             selected = filterType == 1,
                             onClick = { filterType = 1 },
-                            label = { Text("10-bit HEIF (" + uiState.mediaItems.count { it.isHeif }.toString() + ")") }
+                            label = { Text("包含 HEIF (" + captureGroups.count { it.hasHeif }.toString() + ")") }
                         )
                         FilterChip(
                             selected = filterType == 2,
                             onClick = { filterType = 2 },
-                            label = { Text("RAW (" + uiState.mediaItems.count { it.isRaw }.toString() + ")") }
+                            label = { Text("包含 RAW (" + captureGroups.count { it.hasRaw }.toString() + ")") }
                         )
                     }
 
@@ -229,23 +245,25 @@ fun CameraGalleryScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(filteredPhotos, key = { it.handle }) { photo ->
-                            val isSelected = photo.handle in selectedHandles
-                            val progress = uiState.downloadProgressMap[photo.filename]
+                        items(filteredGroups, key = { it.baseName }) { group ->
+                            val isSelected = group.baseName in selectedGroupIds
+                            val visualHandle = group.visualFile.handle
+                            val progress = uiState.downloadProgressMap[group.visualFile.filename]
+                                ?: (group.rawFile?.let { uiState.downloadProgressMap[it.filename] })
 
-                            PhotoGridCell(
-                                photo = photo,
-                                thumbnail = thumbnails[photo.handle],
+                            PhotoGroupGridCell(
+                                group = group,
+                                thumbnail = thumbnails[visualHandle],
                                 isSelected = isSelected,
                                 isSelectMode = isMultiSelectMode,
                                 downloadProgress = progress,
-                                onRequestThumbnail = { viewModel.requestThumbnail(photo) },
+                                onRequestThumbnail = { viewModel.requestThumbnail(group.visualFile) },
                                 onClick = {
                                     if (isMultiSelectMode) {
-                                        if (isSelected) selectedHandles.remove(photo.handle) else selectedHandles.add(photo.handle)
+                                        if (isSelected) selectedGroupIds.remove(group.baseName) else selectedGroupIds.add(group.baseName)
                                     } else {
-                                        // 单击导出该照片
-                                        viewModel.exportPhoto(photo, transcodeToJpeg = photo.isHeif)
+                                        // 点击只查看大图，不触发下载！
+                                        viewingGroup = group
                                     }
                                 }
                             )
@@ -254,21 +272,62 @@ fun CameraGalleryScreen(
                 }
             }
 
-            if (showExportSheet) {
-                val selectedPhotos = uiState.mediaItems.filter { it.handle in selectedHandles }
-                val heifCount = selectedPhotos.count { it.isHeif }
+            // Full Screen Photo Detail Viewer Dialog
+            viewingGroup?.let { group ->
+                PhotoDetailViewerDialog(
+                    group = group,
+                    thumbnail = thumbnails[group.visualFile.handle],
+                    onDismissRequest = { viewingGroup = null },
+                    onDownloadClick = { targetGroup ->
+                        viewingGroup = null
+                        if (targetGroup.isDualFormat) {
+                            downloadingGroup = targetGroup
+                        } else {
+                            if (targetGroup.hasHeif) {
+                                showBatchExportSheet = true
+                                selectedGroupIds.clear()
+                                selectedGroupIds.add(targetGroup.baseName)
+                            } else {
+                                viewModel.exportPhoto(targetGroup.visualFile, transcodeToJpeg = false)
+                            }
+                        }
+                    }
+                )
+            }
+
+            // Dual Format Download Choice Dialog (RAW / HIF / Both)
+            downloadingGroup?.let { group ->
+                GroupDownloadDialog(
+                    group = group,
+                    onDismissRequest = { downloadingGroup = null },
+                    onConfirmDownload = { target, transcodeHeif ->
+                        downloadingGroup = null
+                        viewModel.exportCaptureGroup(group, target, transcodeHeifToJpeg = transcodeHeif)
+                    }
+                )
+            }
+
+            // Batch / HEIF Export Bottom Sheet
+            if (showBatchExportSheet) {
+                val selectedGroups = captureGroups.filter { it.baseName in selectedGroupIds }
+                val heifCount = selectedGroups.count { it.hasHeif }
                 HeifExportBottomSheet(
-                    selectedCount = selectedHandles.size,
+                    selectedCount = selectedGroups.size,
                     heifCount = heifCount,
-                    onDismissRequest = { showExportSheet = false },
+                    onDismissRequest = { showBatchExportSheet = false },
                     onStartExport = { mode, quality ->
-                        showExportSheet = false
+                        showBatchExportSheet = false
                         isMultiSelectMode = false
                         val transcode = mode == HeifExportMode.TRANSCODE_JPEG
-                        selectedPhotos.forEach { photo ->
-                            viewModel.exportPhoto(photo, transcodeToJpeg = transcode, jpegQuality = quality)
+                        selectedGroups.forEach { group ->
+                            if (group.isDualFormat) {
+                                // Default export visual image with requested transcode
+                                viewModel.exportPhoto(group.visualFile, transcodeToJpeg = transcode && group.hasHeif, jpegQuality = quality)
+                            } else {
+                                viewModel.exportPhoto(group.visualFile, transcodeToJpeg = transcode && group.hasHeif, jpegQuality = quality)
+                            }
                         }
-                        selectedHandles.clear()
+                        selectedGroupIds.clear()
                     }
                 )
             }
@@ -277,8 +336,8 @@ fun CameraGalleryScreen(
 }
 
 @Composable
-private fun PhotoGridCell(
-    photo: PtpImageMetadata,
+private fun PhotoGroupGridCell(
+    group: CameraCaptureGroup,
     thumbnail: android.graphics.Bitmap?,
     isSelected: Boolean,
     isSelectMode: Boolean,
@@ -286,7 +345,7 @@ private fun PhotoGridCell(
     onRequestThumbnail: () -> Unit,
     onClick: () -> Unit
 ) {
-    LaunchedEffect(photo.handle) {
+    LaunchedEffect(group.visualFile.handle) {
         if (thumbnail == null) {
             onRequestThumbnail()
         }
@@ -302,11 +361,11 @@ private fun PhotoGridCell(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (thumbnail != null) {
-                androidx.compose.foundation.Image(
+                Image(
                     bitmap = thumbnail.asImageBitmap(),
-                    contentDescription = photo.filename,
+                    contentDescription = group.baseName,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    contentScale = ContentScale.Crop
                 )
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -319,63 +378,87 @@ private fun PhotoGridCell(
                 }
             }
 
-            Surface(
-                modifier = Modifier.padding(6.dp).align(Alignment.TopStart),
-                shape = RoundedCornerShape(4.dp),
-                color = when {
-                    photo.isHeif -> AlphaOrangePrimary
-                    photo.isRaw -> AlphaBlueSecondary
-                    else -> MaterialTheme.colorScheme.surfaceVariant
-                }
-            ) {
-                Text(
-                    text = when {
-                        photo.isHeif -> "10b HIF"
-                        photo.isRaw -> "RAW"
-                        else -> "JPG"
-                    },
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                    color = Color.White
-                )
-            }
-
-            if (isSelectMode) {
-                Box(modifier = Modifier.padding(4.dp).align(Alignment.TopEnd)) {
-                    Checkbox(checked = isSelected, onCheckedChange = { onClick() })
-                }
-            }
-
-            if (downloadProgress != null && downloadProgress < 1f) {
-                CircularProgressIndicator(
-                    progress = { downloadProgress },
-                    modifier = Modifier.size(32.dp).align(Alignment.Center),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            Box(
+            // Top Badges
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .background(Color.Black.copy(alpha = 0.65f))
-                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                    .padding(6.dp)
+                    .align(Alignment.TopStart),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = when {
+                        group.hasRaw && group.hasHeif -> AlphaOrangePrimary
+                        group.hasRaw -> AlphaBlueSecondary
+                        group.hasHeif -> AlphaOrangePrimary
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
                 ) {
                     Text(
-                        text = photo.filename,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontFamily = FontFamily.Monospace),
+                        text = group.badgeLabel,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
                         color = Color.White
                     )
-                    val sizeMb = String.format("%.1fM", photo.fileSize / (1024.0 * 1024.0))
-                    Text(
-                        text = sizeMb,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
+                }
+
+                if (isSelectMode) {
+                    FilledIconButton(
+                        onClick = onClick,
+                        modifier = Modifier.size(24.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.4f)
+                        )
+                    ) {
+                        if (isSelected) {
+                            Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                        }
+                    }
+                }
+            }
+
+            // Bottom Filename Bar
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter),
+                color = Color.Black.copy(alpha = 0.5f)
+            ) {
+                Text(
+                    text = group.baseName,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        color = Color.White
+                    ),
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                )
+            }
+
+            // Download Progress overlay
+            if (downloadProgress != null && downloadProgress < 1f) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = Color.Black.copy(alpha = 0.65f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(
+                                progress = { downloadProgress },
+                                modifier = Modifier.size(32.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = (downloadProgress * 100).toInt().toString() + "%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White
+                            )
+                        }
+                    }
                 }
             }
         }

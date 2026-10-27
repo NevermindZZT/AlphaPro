@@ -318,6 +318,32 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun exportCaptureGroup(
+        group: com.letter.alphapro.core.ptp.CameraCaptureGroup,
+        target: com.letter.alphapro.ui.gallery.GroupDownloadTarget,
+        transcodeHeifToJpeg: Boolean = true,
+        jpegQuality: Int = 95
+    ) {
+        when (target) {
+            com.letter.alphapro.ui.gallery.GroupDownloadTarget.VISUAL_ONLY -> {
+                exportPhoto(group.visualFile, transcodeToJpeg = transcodeHeifToJpeg && group.visualFile.isHeif, jpegQuality = jpegQuality)
+            }
+            com.letter.alphapro.ui.gallery.GroupDownloadTarget.RAW_ONLY -> {
+                group.rawFile?.let { raw ->
+                    exportPhoto(raw, transcodeToJpeg = false)
+                } ?: run {
+                    exportPhoto(group.visualFile, transcodeToJpeg = false)
+                }
+            }
+            com.letter.alphapro.ui.gallery.GroupDownloadTarget.BOTH -> {
+                exportPhoto(group.visualFile, transcodeToJpeg = transcodeHeifToJpeg && group.visualFile.isHeif, jpegQuality = jpegQuality)
+                group.rawFile?.let { raw ->
+                    exportPhoto(raw, transcodeToJpeg = false)
+                }
+            }
+        }
+    }
+
     fun toggleFtpServer(enabled: Boolean) {
         if (enabled) {
             ftpServer.start()

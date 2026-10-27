@@ -95,3 +95,40 @@ object SonyContentParser {
         return SonyCatalogBatch(slot, timestamps, files)
     }
 }
+data class CameraCaptureGroup(
+    val baseName: String,
+    val files: List<PtpImageMetadata>
+) {
+    val visualFile: PtpImageMetadata
+        get() = files.firstOrNull { !it.isRaw && !it.isHeif }
+            ?: files.firstOrNull { it.isHeif }
+            ?: files.first()
+
+    val rawFile: PtpImageMetadata?
+        get() = files.firstOrNull { it.isRaw }
+
+    val hasRaw: Boolean get() = rawFile != null
+    val hasHeif: Boolean get() = files.any { it.isHeif }
+    val hasJpeg: Boolean get() = files.any { !it.isRaw && !it.isHeif }
+    val isDualFormat: Boolean get() = hasRaw && (hasHeif || hasJpeg)
+
+    val badgeLabel: String
+        get() = when {
+            hasRaw && hasHeif -> "RAW + 10b HIF"
+            hasRaw && hasJpeg -> "RAW + JPG"
+            hasHeif -> "10b HIF"
+            hasRaw -> "RAW"
+            else -> "JPG"
+        }
+
+    val totalSizeMb: Double
+        get() = files.sumOf { it.fileSize } / (1024.0 * 1024.0)
+
+    val filename: String get() = visualFile.filename
+    val captureDate: String get() = visualFile.captureDate
+}
+
+fun List<PtpImageMetadata>.toCaptureGroups(): List<CameraCaptureGroup> {
+    return this.groupBy { it.filename.substringBeforeLast('.') }
+        .map { (name, list) -> CameraCaptureGroup(name, list) }
+}
