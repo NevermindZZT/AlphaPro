@@ -2,6 +2,7 @@ package com.letter.alphapro.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.coroutines.flow.MutableStateFlow
 
 enum class AppThemeMode(val label: String) {
     FOLLOW_SYSTEM("跟随系统"),
@@ -21,9 +22,37 @@ enum class DefaultHeifPolicy(val label: String) {
     ALWAYS_ASK("每次询问")
 }
 
+object AppThemeState {
+    private var initialized = false
+    val themeMode = MutableStateFlow(AppThemeMode.FOLLOW_SYSTEM)
+    val dynamicColor = MutableStateFlow(true)
+
+    fun init(prefs: CameraPreferences) {
+        if (!initialized) {
+            themeMode.value = prefs.themeMode
+            dynamicColor.value = prefs.isDynamicColorEnabled
+            initialized = true
+        }
+    }
+
+    fun setThemeMode(prefs: CameraPreferences, mode: AppThemeMode) {
+        prefs.themeMode = mode
+        themeMode.value = mode
+    }
+
+    fun setDynamicColor(prefs: CameraPreferences, enabled: Boolean) {
+        prefs.isDynamicColorEnabled = enabled
+        dynamicColor.value = enabled
+    }
+}
+
 class CameraPreferences(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("alphapro_camera_prefs", Context.MODE_PRIVATE)
+
+    init {
+        AppThemeState.init(this)
+    }
 
     var pairedDeviceAddress: String?
         get() = prefs.getString("paired_device_address", null)

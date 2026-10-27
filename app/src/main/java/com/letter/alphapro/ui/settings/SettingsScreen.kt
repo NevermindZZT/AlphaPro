@@ -87,7 +87,6 @@ fun SettingsScreen(
             // 1. Project Hero Card & Version Display
             ProjectHeroCard(
                 version = com.letter.alphapro.BuildConfig.VERSION_NAME,
-                build = com.letter.alphapro.BuildConfig.VERSION_CODE,
                 repoUrl = GITHUB_REPO_URL,
                 onOpenRepo = {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_REPO_URL))
@@ -387,7 +386,6 @@ fun SettingsScreen(
 @Composable
 private fun ProjectHeroCard(
     version: String,
-    build: Int,
     repoUrl: String,
     onOpenRepo: () -> Unit,
     onCopyRepo: () -> Unit
@@ -431,7 +429,7 @@ private fun ProjectHeroCard(
                             color = MaterialTheme.colorScheme.primaryContainer
                         ) {
                             Text(
-                                text = "v$version (Build $build)",
+                                text = "v$version",
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold,

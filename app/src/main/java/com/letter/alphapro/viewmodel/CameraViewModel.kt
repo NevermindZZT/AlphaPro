@@ -428,11 +428,8 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     // Unified App Settings StateFlows
-    private val _themeMode = MutableStateFlow(prefs.themeMode)
-    val themeMode: StateFlow<com.letter.alphapro.data.AppThemeMode> = _themeMode.asStateFlow()
-
-    private val _dynamicColor = MutableStateFlow(prefs.isDynamicColorEnabled)
-    val dynamicColor: StateFlow<Boolean> = _dynamicColor.asStateFlow()
+    val themeMode: StateFlow<com.letter.alphapro.data.AppThemeMode> = com.letter.alphapro.data.AppThemeState.themeMode.asStateFlow()
+    val dynamicColor: StateFlow<Boolean> = com.letter.alphapro.data.AppThemeState.dynamicColor.asStateFlow()
 
     private val _gpsInterval = MutableStateFlow(prefs.gpsInterval)
     val gpsInterval: StateFlow<com.letter.alphapro.data.GpsInterval> = _gpsInterval.asStateFlow()
@@ -450,13 +447,11 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     val autoWake: StateFlow<Boolean> = _autoWake.asStateFlow()
 
     fun setThemeMode(mode: com.letter.alphapro.data.AppThemeMode) {
-        prefs.themeMode = mode
-        _themeMode.value = mode
+        com.letter.alphapro.data.AppThemeState.setThemeMode(prefs, mode)
     }
 
     fun setDynamicColor(enabled: Boolean) {
-        prefs.isDynamicColorEnabled = enabled
-        _dynamicColor.value = enabled
+        com.letter.alphapro.data.AppThemeState.setDynamicColor(prefs, enabled)
     }
 
     fun setGpsInterval(interval: com.letter.alphapro.data.GpsInterval) {
