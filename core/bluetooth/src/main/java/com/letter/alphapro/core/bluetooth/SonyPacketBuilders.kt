@@ -126,16 +126,15 @@ object SonyTimeSyncPacketBuilder {
 }
 
 object SonyWifiDataParser {
-    /**
-     * Sony cameras prepend a 3-byte header to the SSID and password.
-     */
-    fun parsePrefixedAscii(value: ByteArray): String? {
-        return if (value.size > 3) parseAscii(value.copyOfRange(3, value.size)) else null
-    }
+    /** CC06/CC07 have three protocol bytes, independent of the first byte's value. */
+    fun parsePrefixedAscii(value: ByteArray): String? =
+        if (value.size > 3) parseAscii(value.copyOfRange(3, value.size)) else null
 
     fun parseAscii(value: ByteArray): String? {
-        if (value.isEmpty() || value.any { it.toInt() !in 32..126 }) return null
-        return value.map { it.toInt().toChar() }.joinToString("")
+        // Allow trailing C terminators, but preserve spaces: they are valid credential bytes.
+        val bytes = value.dropLastWhile { it == 0.toByte() }
+        if (bytes.isEmpty() || bytes.any { (it.toInt() and 0xff) !in 32..126 }) return null
+        return bytes.map { (it.toInt() and 0xff).toChar() }.joinToString("")
     }
 
     /**

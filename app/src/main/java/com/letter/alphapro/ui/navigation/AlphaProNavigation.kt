@@ -37,6 +37,13 @@ fun AlphaProApp(viewModel: CameraViewModel = viewModel()) {
         }
     }
 
+    uiState.wifiFailureDiagnostic?.let { diagnostic ->
+        com.letter.alphapro.ui.components.WifiDiagnosticDialog(
+            diagnostic = diagnostic,
+            onDismiss = viewModel::dismissWifiDiagnostic
+        )
+    }
+
     Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },

@@ -43,6 +43,7 @@ data class CameraUiState(
     val activeIntervalRemaining: Int? = null,
     val bulbElapsedSeconds: Int = 0,
     val isBulbActive: Boolean = false,
+    val wifiFailureDiagnostic: String? = null,
     val userNotice: String? = null
 )
 
@@ -78,6 +79,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
+    private var wifiJob: Job? = null
     private var scanJob: Job? = null
     private var bulbJob: Job? = null
     private var intervalJob: Job? = null
@@ -228,47 +230,74 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun connectCameraWifi() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(userNotice = "正在通过蓝牙获取相机 Wi-Fi 凭证...") }
-            var credentials = gattManager.readWifiCredentials()
-
-            // If BLE read timed out or failed, fall back to previously saved credentials
-            if (credentials == null && !prefs.lastWifiSsid.isNullOrEmpty() && !prefs.lastWifiPassword.isNullOrEmpty()) {
-                credentials = SonyWifiCredentials(prefs.lastWifiSsid!!, prefs.lastWifiPassword!!)
-            }
-
-            if (credentials == null) {
-                _uiState.update { it.copy(userNotice = "无法获取相机 Wi-Fi 凭证，请确认相机蓝牙已连接并在菜单中开启网络连接") }
-                return@launch
-            }
-
-            prefs.lastWifiSsid = credentials.ssid
-            prefs.lastWifiPassword = credentials.password
-
-            _uiState.update { it.copy(userNotice = "正在直连相机 Wi-Fi: " + credentials.ssid) }
-
-            wifiConnector.connectCameraWifi(credentials.ssid, credentials.password)
-                .collect { wifiState ->
-                    _uiState.update { it.copy(wifiState = wifiState) }
-                    if (wifiState is CameraWifiState.Connected) {
-                        _uiState.update { it.copy(userNotice = "Wi-Fi 直连成功，正在读取机内照片...") }
-                        loadCameraMedia(wifiState.gatewayIp, wifiState.network)
-                    }
-                }
+        // Set busy before launching or reading credentials, so repeated taps cannot queue bootstraps.
+        if (wifiJob?.isActive == true || _uiState.value.wifiState is CameraWifiState.Connecting) return
+        if (gattManager.connectionState.value !is SonyBleConnectionState.Ready) {
+            _uiState.update { it.copy(userNotice = "请等待相机蓝牙完成握手后再连接 Wi-Fi") }
+            return
         }
+        val wifiManager = getApplication<Application>().getSystemService(WifiManager::class.java)
+        if (wifiManager?.isWifiEnabled == false) {
+            _uiState.update { it.copy(userNotice = "请先开启手机 Wi-Fi") }
+            return
+        }
+        _uiState.update { it.copy(wifiState = CameraWifiState.Connecting, wifiFailureDiagnostic = null,
+            userNotice = "正在通过蓝牙读取热点信息…") }
+        wifiJob = viewModelScope.launch {
+            fun fail(message: String) {
+                _uiState.update { it.copy(wifiState = CameraWifiState.Error(message), userNotice = message,
+                    wifiFailureDiagnostic = "Wi-Fi 诊断 W2 · " + com.letter.alphapro.BuildConfig.VERSION_NAME +
+                        "\n" + gattManager.wifiDiagnostic.value + "\n" + message) }
+            }
+            try {
+                val credentials = gattManager.readWifiCredentials()
+                if (credentials == null) {
+                    fail("相机热点信息读取失败，请查看诊断详情")
+                    return@launch
+                }
+                // Do not copy passwords to the system clipboard automatically.
+                prefs.lastWifiSsid = credentials.ssid
+                prefs.lastWifiPassword = credentials.password
+                _uiState.update { it.copy(userNotice = "热点信息已读取，等待系统 Wi-Fi 连接确认…") }
+                wifiConnector.connectCameraWifi(credentials.ssid, credentials.password)
+                    .collect { state ->
+                        val previous = _uiState.value.wifiState
+                        _uiState.update { it.copy(wifiState = state) }
+                        when (state) {
+                            is CameraWifiState.Connected -> {
+                                if (previous !is CameraWifiState.Connected || previous.network != state.network ||
+                                    previous.gatewayIp != state.gatewayIp) {
+                                    _uiState.update { it.copy(userNotice = "Wi-Fi 已连接，正在读取照片…") }
+                                    loadCameraMedia(state.gatewayIp, state.network)
+                                }
+                            }
+                            is CameraWifiState.Error -> fail("热点信息已读取；" + state.message)
+                            else -> Unit
+                        }
+                    }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                fail("Wi-Fi 流程异常：" + error.javaClass.simpleName)
+            } finally {
+                if (_uiState.value.wifiState is CameraWifiState.Connecting) {
+                    _uiState.update { it.copy(wifiState = CameraWifiState.Idle) }
+                }
+            }
+        }
+    }
+
+    fun dismissWifiDiagnostic() {
+        _uiState.update { it.copy(wifiFailureDiagnostic = null) }
     }
 
     fun disconnectCameraWifi() {
         viewModelScope.launch {
+            wifiJob?.cancelAndJoin()
+            wifiJob = null
             wifiConnector.release()
             ptpClient.disconnect()
-            _uiState.update {
-                it.copy(
-                    wifiState = CameraWifiState.Idle,
-                    mediaItems = emptyList(),
-                    userNotice = "Wi-Fi 已断开"
-                )
-            }
+            _uiState.update { it.copy(wifiState = CameraWifiState.Idle, mediaItems = emptyList(), userNotice = "Wi-Fi 已断开") }
         }
     }
 

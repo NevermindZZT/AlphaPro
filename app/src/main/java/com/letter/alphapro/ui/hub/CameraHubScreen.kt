@@ -427,7 +427,7 @@ private fun BentoWifiCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 FilledTonalButton(
                     onClick = if (isConnected) onDisconnect else onConnect,
-                    enabled = !isConnecting,
+                    enabled = !isConnecting && (isConnected || isBleConnected),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(32.dp),

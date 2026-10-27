@@ -184,7 +184,7 @@ fun CameraGalleryScreen(
                         )
                         Button(
                             onClick = { viewModel.connectCameraWifi() },
-                            enabled = !isWifiConnecting,
+                            enabled = !isWifiConnecting && uiState.bleState is com.letter.alphapro.core.bluetooth.SonyBleConnectionState.Ready,
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             if (isWifiConnecting) {

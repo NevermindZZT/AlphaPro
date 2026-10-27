@@ -7,6 +7,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,124 +32,130 @@ data class SonyWifiCredentials(
     val ssid: String,
     val password: String,
     val bssid: String? = null
-)
+) {
+    override fun toString(): String = "SonyWifiCredentials(redacted)"
+}
 
 @SuppressLint("MissingPermission")
 class SonyBleGattManager(
     private val context: Context,
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
 ) {
     private val _connectionState = MutableStateFlow<SonyBleConnectionState>(SonyBleConnectionState.Disconnected)
     val connectionState: StateFlow<SonyBleConnectionState> = _connectionState.asStateFlow()
 
-    private var bluetoothGatt: BluetoothGatt? = null
+    @Volatile private var bluetoothGatt: BluetoothGatt? = null
     var targetDeviceAddress: String? = null
         private set
     private var locationConfig = LocationDataConfig(shouldSendTimeZoneAndDst = true)
     private var lastKnownLocation: Pair<Double, Double>? = null
 
-    private val gattMutex = Mutex()
-    private var pendingWriteDeferred: CompletableDeferred<Boolean>? = null
-    private var pendingReadDeferred: CompletableDeferred<ByteArray?>? = null
-    private var pendingDescriptorDeferred: CompletableDeferred<Boolean>? = null
-
+    private val operationLane = GattOperationLane()
+    private val wifiSetupMutex = Mutex()
+    @Volatile private var negotiatedMtu = 23
     private var bondReceiver: BroadcastReceiver? = null
     private var autoReconnectJob: Job? = null
+    private var handshakeJob: Job? = null
+    private val diagnosticLock = Any()
+    private val diagnosticLines = mutableListOf<String>()
+    @Volatile private var diagnosticActive = false
+    private var diagnosticStarted = 0L
+    private val _wifiDiagnostic = MutableStateFlow("")
+    val wifiDiagnostic: StateFlow<String> = _wifiDiagnostic.asStateFlow()
+
+    private fun traceWifi(message: String) {
+        synchronized(diagnosticLock) {
+            if (!diagnosticActive) return
+            val line = "+" + (SystemClock.elapsedRealtime() - diagnosticStarted) + "ms " + message
+            diagnosticLines.add(line)
+            if (diagnosticLines.size > 100) diagnosticLines.removeAt(0)
+            _wifiDiagnostic.value = diagnosticLines.joinToString("\n")
+            // Only stage/UUID/status/counts. Never log attribute payload, SSID, password or address.
+            android.util.Log.d("AlphaProWifi", line)
+        }
+    }
+
+    private fun attributeKey(char: BluetoothGattCharacteristic) = "${char.uuid}:${char.instanceId}"
+    private fun descriptorKey(desc: BluetoothGattDescriptor) = attributeKey(desc.characteristic) + ":" + desc.uuid
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+            if (gatt !== bluetoothGatt) return
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     if (status == BluetoothGatt.GATT_SUCCESS) {
+                        operationLane.activate(gatt)
+                        negotiatedMtu = 23
                         _connectionState.value = SonyBleConnectionState.DiscoveringServices
                         gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
                         scope.launch {
-                            delay(500) // Settle link parameters before discovery
-                            gatt.discoverServices()
+                            delay(500)
+                            if (gatt === bluetoothGatt && !gatt.discoverServices()) {
+                                retireGatt(gatt)
+                            }
                         }
-                    } else {
-                        _connectionState.value = SonyBleConnectionState.Error("连接失败: status $status")
-                        disconnect()
-                    }
+                    } else retireGatt(gatt)
                 }
-                BluetoothProfile.STATE_DISCONNECTED -> {
-                    _connectionState.value = SonyBleConnectionState.Disconnected
-                    cleanupGatt()
-                    scheduleAutoReconnect()
-                }
+                BluetoothProfile.STATE_DISCONNECTED -> retireGatt(gatt)
             }
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                scope.launch {
-                    delay(300)
-                    performSonyHandshake(gatt)
+            if (gatt !== bluetoothGatt) return
+            if (status != BluetoothGatt.GATT_SUCCESS) { retireGatt(gatt); return }
+            handshakeJob?.cancel()
+            handshakeJob = scope.launch {
+                delay(300)
+                if (gatt === bluetoothGatt) {
+                    try { performSonyHandshake(gatt) }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { retireGatt(gatt) }
                 }
-            } else {
-                _connectionState.value = SonyBleConnectionState.Error("服务发现失败: status $status")
             }
         }
 
-        override fun onCharacteristicWrite(
-            gatt: BluetoothGatt,
-            characteristic: BluetoothGattCharacteristic,
-            status: Int
-        ) {
-            val deferred = pendingWriteDeferred
-            pendingWriteDeferred = null
-            deferred?.complete(status == BluetoothGatt.GATT_SUCCESS)
+        override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+            if (gatt !== bluetoothGatt) return
+            if (status == BluetoothGatt.GATT_SUCCESS) negotiatedMtu = mtu
+            operationLane.complete(gatt, GattOperationKind.MTU, "mtu", status)
         }
 
-        override fun onCharacteristicRead(
-            gatt: BluetoothGatt,
-            characteristic: BluetoothGattCharacteristic,
-            value: ByteArray,
-            status: Int
-        ) {
-            val bytes = if (status == BluetoothGatt.GATT_SUCCESS) value else null
-            val deferred = pendingReadDeferred
-            pendingReadDeferred = null
-            deferred?.complete(bytes)
+        override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+            operationLane.complete(gatt, GattOperationKind.WRITE, attributeKey(characteristic), status)
+        }
+
+        override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray, status: Int) {
+            operationLane.complete(gatt, GattOperationKind.READ, attributeKey(characteristic), status, value)
         }
 
         @Deprecated("Deprecated in Java")
-        override fun onCharacteristicRead(
-            gatt: BluetoothGatt,
-            characteristic: BluetoothGattCharacteristic,
-            status: Int
-        ) {
-            @Suppress("DEPRECATION")
-            val bytes = if (status == BluetoothGatt.GATT_SUCCESS) characteristic.value else null
-            val deferred = pendingReadDeferred
-            pendingReadDeferred = null
-            deferred?.complete(bytes)
+        override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+            // API 33+ dispatches the value-bearing overload. Do not deliver a duplicate legacy event.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                @Suppress("DEPRECATION")
+                operationLane.complete(gatt, GattOperationKind.READ, attributeKey(characteristic), status, characteristic.value)
+            }
         }
 
-        override fun onDescriptorWrite(
-            gatt: BluetoothGatt,
-            descriptor: BluetoothGattDescriptor,
-            status: Int
-        ) {
-            val deferred = pendingDescriptorDeferred
-            pendingDescriptorDeferred = null
-            deferred?.complete(status == BluetoothGatt.GATT_SUCCESS)
+        override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+            operationLane.complete(gatt, GattOperationKind.DESCRIPTOR, descriptorKey(descriptor), status)
         }
+    }
 
-        override fun onCharacteristicChanged(
-            gatt: BluetoothGatt,
-            characteristic: BluetoothGattCharacteristic,
-            value: ByteArray
-        ) {}
-
-        @Deprecated("Deprecated in Java")
-        override fun onCharacteristicChanged(
-            gatt: BluetoothGatt,
-            characteristic: BluetoothGattCharacteristic
-        ) {}
+    /** Only retire the exact session that failed; an old callback cannot close its replacement. */
+    private fun retireGatt(gatt: BluetoothGatt) {
+        if (gatt !== bluetoothGatt) return
+        traceWifi("BLE 会话关闭；等待自动重连")
+        cleanupGatt()
+        _connectionState.value = SonyBleConnectionState.Disconnected
+        scheduleAutoReconnect()
     }
 
     fun connect(address: String) {
+        scope.launch { connectInternal(address) }
+    }
+
+    private fun connectInternal(address: String) {
         val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         val adapter = bluetoothManager?.adapter ?: return
         val device = try {
@@ -155,6 +164,9 @@ class SonyBleGattManager(
             _connectionState.value = SonyBleConnectionState.Error("无效蓝牙地址: $address")
             return
         }
+
+        if (targetDeviceAddress.equals(address, ignoreCase = true) &&
+            _connectionState.value is SonyBleConnectionState.Pairing) return
 
         // Idempotency check: If already connected or connecting to this device, do NOT tear it down!
         if (targetDeviceAddress.equals(address, ignoreCase = true) &&
@@ -189,7 +201,8 @@ class SonyBleGattManager(
         unregisterBondReceiver()
         _connectionState.value = SonyBleConnectionState.Connecting
         cleanupGatt()
-        bluetoothGatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+        bluetoothGatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE,
+            BluetoothDevice.PHY_LE_1M_MASK, Handler(Looper.getMainLooper()))
     }
 
     private fun scheduleAutoReconnect() {
@@ -238,6 +251,10 @@ class SonyBleGattManager(
     }
 
     fun disconnect() {
+        scope.launch { disconnectInternal() }
+    }
+
+    private fun disconnectInternal() {
         targetDeviceAddress = null
         autoReconnectJob?.cancel()
         unregisterBondReceiver()
@@ -247,10 +264,13 @@ class SonyBleGattManager(
     }
 
     private fun cleanupGatt() {
-        try {
-            bluetoothGatt?.close()
-        } catch (_: Exception) {}
+        val old = bluetoothGatt
         bluetoothGatt = null
+        handshakeJob?.cancel()
+        old?.let {
+            operationLane.close(it)
+            try { it.close() } catch (_: Exception) {}
+        }
     }
 
     private fun findCharacteristic(gatt: BluetoothGatt, uuid: UUID): BluetoothGattCharacteristic? {
@@ -258,6 +278,7 @@ class SonyBleGattManager(
     }
 
     private suspend fun performSonyHandshake(gatt: BluetoothGatt) {
+        if (gatt !== bluetoothGatt) return
         _connectionState.value = SonyBleConnectionState.Handshaking
 
         // 1. Subscribe to DD01 (CHARACTERISTIC_LOCATION_ENABLED_IN_CAMERA)
@@ -310,6 +331,7 @@ class SonyBleGattManager(
         // Lower connection priority to balanced to conserve battery
         gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_BALANCED)
 
+        if (gatt !== bluetoothGatt || !operationLane.isActive(gatt)) return
         val deviceName = gatt.device.name ?: "Sony Camera"
         _connectionState.value = SonyBleConnectionState.Ready(deviceName, gatt.device.address)
 
@@ -342,204 +364,162 @@ class SonyBleGattManager(
         return writeCharacteristic(cc13, packet)
     }
 
-    suspend fun readWifiCredentials(): SonyWifiCredentials? = gattMutex.withLock {
-        val gatt = bluetoothGatt ?: return@withLock null
-
-        // Ensure services are populated
-        if (gatt.services.isNullOrEmpty()) {
-            gatt.discoverServices()
-            delay(800)
+    suspend fun readWifiCredentials(): SonyWifiCredentials? {
+        if (!wifiSetupMutex.tryLock()) return null
+        synchronized(diagnosticLock) {
+            diagnosticStarted = SystemClock.elapsedRealtime()
+            diagnosticLines.clear()
+            diagnosticActive = true
+            _wifiDiagnostic.value = ""
         }
-
-        val wifiPower = findCharacteristic(gatt, SonyBleConstants.CHAR_WIFI_POWER_UUID) ?: return@withLock null
-        val wifiSsid = findCharacteristic(gatt, SonyBleConstants.CHAR_WIFI_SSID_UUID) ?: return@withLock null
-        val wifiPwd = findCharacteristic(gatt, SonyBleConstants.CHAR_WIFI_PASSWORD_UUID) ?: return@withLock null
-
-        // 1. Send Wi-Fi ON command to camera (write 0x01 to CC08)
-        writeCharacteristicInternal(wifiPower, SonyBleConstants.CMD_WIFI_POWER_ON)
-
-        // 2. Poll camera status CC09 until Wi-Fi state == 2 (Wi-Fi ON)
-        val statusChar = findCharacteristic(gatt, SonyBleConstants.CHAR_CAMERA_STATUS_UUID)
-        if (statusChar != null) {
-            var waitCount = 0
-            while (waitCount++ < 25) {
-                val statusBytes = readCharacteristicInternal(statusChar)
-                if (statusBytes != null) {
-                    val status = SonyWifiDataParser.parseWifiStatus(statusBytes)
-                    if (status?.first == 2) break
-                    if (status?.first == 0 && status.second in 2..5) {
-                        return@withLock null
-                    }
+        try {
+            val gatt = bluetoothGatt ?: throw SonyWifiSetupException("蓝牙未连接")
+            if (_connectionState.value !is SonyBleConnectionState.Ready) {
+                throw SonyWifiSetupException("蓝牙尚未完成握手，请等待联机")
+            }
+            traceWifi("开始 Wi-Fi 凭据读取；BLE MTU=" + negotiatedMtu)
+            val port = object : SonyWifiBootstrapPort {
+                override fun isReady() = gatt === bluetoothGatt && operationLane.isActive(gatt) &&
+                    _connectionState.value is SonyBleConnectionState.Ready
+                override fun hasCharacteristic(uuid: UUID) = findCharacteristic(gatt, uuid) != null
+                override suspend fun prepareMtu() {
+                    if (negotiatedMtu >= 67) return
+                    val result = executeGatt(gatt, GattOperationKind.MTU, "mtu") { gatt.requestMtu(517) }
+                    traceWifi("MTU 结果 status=" + result.status + " mtu=" + negotiatedMtu)
                 }
-                delay(500)
+                override suspend fun subscribe(uuid: UUID): Boolean {
+                    val char = findCharacteristic(gatt, uuid) ?: return false
+                    return subscribeToNotifications(char)
+                }
+                override suspend fun read(uuid: UUID): ByteArray? {
+                    val char = findCharacteristic(gatt, uuid) ?: throw SonyWifiSetupException("特征已失效")
+                    val result = executeGatt(gatt, GattOperationKind.READ, attributeKey(char)) { gatt.readCharacteristic(char) }
+                    if (result.status == 5 || result.status == 15) {
+                        throw SonyWifiSetupException(uuid.toString().take(8) + "：认证/加密失败 status=" + result.status)
+                    }
+                    return if (result.status == BluetoothGatt.GATT_SUCCESS) result.value else null
+                }
+                override suspend fun write(uuid: UUID, value: ByteArray): Boolean {
+                    val char = findCharacteristic(gatt, uuid) ?: return false
+                    return writeCharacteristic(char, value)
+                }
             }
-        } else {
-            delay(1500)
-        }
-
-        // 3. Poll SSID characteristic (CC06) and parse prefixed ASCII
-        var ssid: String? = null
-        var pollCount = 0
-        while (ssid == null && pollCount++ < 25) {
-            val ssidBytes = readCharacteristicInternal(wifiSsid)
-            if (ssidBytes != null) {
-                ssid = SonyWifiDataParser.parsePrefixedAscii(ssidBytes)
+            return SonyWifiBootstrap(port, ::traceWifi).prepare()
+        } catch (cancelled: CancellationException) {
+            traceWifi("用户取消 Wi-Fi 连接")
+            throw cancelled
+        } catch (error: Exception) {
+            val detail = when (error) {
+                is SonyWifiSetupException, is GattOperationException -> error.message ?: "蓝牙操作失败"
+                is SecurityException -> "缺少蓝牙权限"
+                else -> "内部错误 " + error.javaClass.simpleName
             }
-            if (ssid == null) delay(500)
+            traceWifi("失败：" + detail)
+            return null
+        } finally {
+            diagnosticActive = false
+            wifiSetupMutex.unlock()
         }
-        if (ssid == null) return@withLock null
-
-        // 4. Poll Password characteristic (CC07) and parse prefixed ASCII
-        var password: String? = null
-        pollCount = 0
-        while (password == null && pollCount++ < 25) {
-            val pwdBytes = readCharacteristicInternal(wifiPwd)
-            if (pwdBytes != null) {
-                password = SonyWifiDataParser.parsePrefixedAscii(pwdBytes)
-            }
-            if (password == null) delay(500)
-        }
-        if (password == null) return@withLock null
-
-        // 5. Read BSSID (CC0C) if present
-        val bssidChar = findCharacteristic(gatt, SonyBleConstants.CHAR_WIFI_BSSID_UUID)
-        val bssidBytes = bssidChar?.let { readCharacteristicInternal(it) }
-        val bssid = bssidBytes?.let { SonyWifiDataParser.parseAscii(it) }
-
-        SonyWifiCredentials(ssid = ssid.trim(), password = password.trim(), bssid = bssid?.trim())
     }
 
     suspend fun sendRemoteCommand(command: ByteArray): Boolean {
+        if (_connectionState.value !is SonyBleConnectionState.Ready) return false
         val gatt = bluetoothGatt ?: return false
         val char = findCharacteristic(gatt, SonyBleConstants.CHAR_REMOTE_COMMAND_UUID) ?: return false
+        return writeCharacteristic(char, command, preferNoResponse = true)
+    }
 
-        // For remote shutter commands, always use WRITE_TYPE_NO_RESPONSE if available for zero-latency execution
-        val writeType = if (char.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0) {
-            BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-        } else {
-            BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-        }
-
-        return gattMutex.withLock {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                val res = gatt.writeCharacteristic(char, command, writeType)
-                res == BluetoothStatusCodes.SUCCESS
-            } else {
-                @Suppress("DEPRECATION")
-                char.value = command
-                @Suppress("DEPRECATION")
-                char.writeType = writeType
-                @Suppress("DEPRECATION")
-                gatt.writeCharacteristic(char)
+    private suspend fun executeGatt(
+        gatt: BluetoothGatt,
+        kind: GattOperationKind,
+        attribute: String,
+        initiate: () -> Boolean
+    ): GattOperationResult {
+        val started = SystemClock.elapsedRealtime()
+        val diagnostic = !attribute.startsWith(SonyBleConstants.CHAR_LOCATION_DATA_UUID.toString())
+        if (diagnostic) traceWifi("GATT " + kind + " " + attribute + " start mtu=" + negotiatedMtu)
+        try {
+            val result = operationLane.execute(gatt, kind, attribute, initiate = initiate)
+            if (diagnostic) traceWifi("GATT " + kind + " " + attribute + " status=" + result.status +
+                " bytes=" + (result.value?.size ?: 0) + " elapsed=" + (SystemClock.elapsedRealtime() - started))
+            return result
+        } catch (error: Exception) {
+            if (diagnostic) traceWifi("GATT " + kind + " " + attribute + " " +
+                (if (error is GattOperationException) error.message else error.javaClass.simpleName))
+            // No transaction ID exists in ATT callbacks. Do not reuse a timed-out/cancelled lane:
+            // a late completion could otherwise be mistaken for the next read of the same UUID.
+            if (!operationLane.isActive(gatt)) {
+                withContext(NonCancellable + Dispatchers.Main.immediate) { retireGatt(gatt) }
             }
+            throw error
         }
+    }
+
+    private fun currentGattFor(char: BluetoothGattCharacteristic): BluetoothGatt? {
+        val gatt = bluetoothGatt ?: return null
+        return gatt.takeIf { findCharacteristic(it, char.uuid) === char }
     }
 
     private suspend fun writeCharacteristic(
         characteristic: BluetoothGattCharacteristic,
-        data: ByteArray
-    ): Boolean = gattMutex.withLock {
-        writeCharacteristicInternal(characteristic, data)
-    }
-
-    private suspend fun readCharacteristic(
-        characteristic: BluetoothGattCharacteristic
-    ): ByteArray? = gattMutex.withLock {
-        readCharacteristicInternal(characteristic)
-    }
-
-    private suspend fun subscribeToNotifications(
-        characteristic: BluetoothGattCharacteristic
-    ): Boolean = gattMutex.withLock {
-        val gatt = bluetoothGatt ?: return@withLock false
-        val descriptor = characteristic.getDescriptor(SonyBleConstants.CLIENT_CHARACTERISTIC_CONFIG_UUID) ?: return@withLock false
-
-        gatt.setCharacteristicNotification(characteristic, true)
-        writeDescriptorInternal(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
-    }
-
-    private suspend fun writeDescriptorInternal(
-        desc: BluetoothGattDescriptor,
-        data: ByteArray
+        data: ByteArray,
+        preferNoResponse: Boolean = false
     ): Boolean {
-        val gatt = bluetoothGatt ?: return false
-        val deferred = CompletableDeferred<Boolean>()
-        pendingDescriptorDeferred = deferred
-
-        val initiated = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val res = gatt.writeDescriptor(desc, data)
-            res == BluetoothStatusCodes.SUCCESS
-        } else {
-            @Suppress("DEPRECATION")
-            desc.value = data
-            @Suppress("DEPRECATION")
-            gatt.writeDescriptor(desc)
-        }
-        if (!initiated) {
-            pendingDescriptorDeferred = null
-            return false
-        }
-
-        return withTimeoutOrNull(2500) {
-            deferred.await()
-        } ?: false
-    }
-
-    private suspend fun writeCharacteristicInternal(
-        char: BluetoothGattCharacteristic,
-        data: ByteArray
-    ): Boolean {
-        val gatt = bluetoothGatt ?: return false
-        val deferred = CompletableDeferred<Boolean>()
-        pendingWriteDeferred = deferred
-
-        val writeType = if (char.properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0) {
-            BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-        } else {
+        val gatt = currentGattFor(characteristic) ?: return false
+        val writeType = if (preferNoResponse &&
+            characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0) {
             BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-        }
-
-        val initiated = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val res = gatt.writeCharacteristic(char, data, writeType)
-            res == BluetoothStatusCodes.SUCCESS
-        } else {
-            @Suppress("DEPRECATION")
-            char.value = data
-            @Suppress("DEPRECATION")
-            char.writeType = writeType
-            @Suppress("DEPRECATION")
-            gatt.writeCharacteristic(char)
-        }
-        if (!initiated) {
-            pendingWriteDeferred = null
-            return false
-        }
-
-        if (writeType == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) {
-            pendingWriteDeferred = null
-            return true
-        }
-
-        return withTimeoutOrNull(2500) {
-            deferred.await()
-        } ?: false
+        } else if (characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0) {
+            BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+        } else BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+        return try {
+            executeGatt(gatt, GattOperationKind.WRITE, attributeKey(characteristic)) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    gatt.writeCharacteristic(characteristic, data, writeType) == BluetoothStatusCodes.SUCCESS
+                } else {
+                    @Suppress("DEPRECATION")
+                    characteristic.value = data
+                    characteristic.writeType = writeType
+                    @Suppress("DEPRECATION")
+                    gatt.writeCharacteristic(characteristic)
+                }
+            }.status == BluetoothGatt.GATT_SUCCESS
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: GattOperationException) { false }
     }
 
-    private suspend fun readCharacteristicInternal(
-        char: BluetoothGattCharacteristic
-    ): ByteArray? {
-        val gatt = bluetoothGatt ?: return null
-        val deferred = CompletableDeferred<ByteArray?>()
-        pendingReadDeferred = deferred
+    private suspend fun readCharacteristic(characteristic: BluetoothGattCharacteristic): ByteArray? {
+        val gatt = currentGattFor(characteristic) ?: return null
+        return try {
+            val result = executeGatt(gatt, GattOperationKind.READ, attributeKey(characteristic)) {
+                gatt.readCharacteristic(characteristic)
+            }
+            if (result.status == BluetoothGatt.GATT_SUCCESS) result.value else null
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: GattOperationException) { null }
+    }
 
-        val initiated = gatt.readCharacteristic(char)
-        if (!initiated) {
-            pendingReadDeferred = null
-            return null
+    private suspend fun subscribeToNotifications(characteristic: BluetoothGattCharacteristic): Boolean {
+        val gatt = currentGattFor(characteristic) ?: return false
+        val descriptor = characteristic.getDescriptor(SonyBleConstants.CLIENT_CHARACTERISTIC_CONFIG_UUID) ?: return false
+        val value = when {
+            characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0 -> BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            characteristic.properties and BluetoothGattCharacteristic.PROPERTY_INDICATE != 0 -> BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+            else -> return false
         }
-
-        return withTimeoutOrNull(2500) {
-            deferred.await()
-        }
+        return try {
+            executeGatt(gatt, GattOperationKind.DESCRIPTOR, descriptorKey(descriptor)) {
+                if (!gatt.setCharacteristicNotification(characteristic, true)) false
+                else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    gatt.writeDescriptor(descriptor, value) == BluetoothStatusCodes.SUCCESS
+                } else {
+                    @Suppress("DEPRECATION")
+                    descriptor.value = value
+                    @Suppress("DEPRECATION")
+                    gatt.writeDescriptor(descriptor)
+                }
+            }.status == BluetoothGatt.GATT_SUCCESS
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: GattOperationException) { false }
     }
 }
