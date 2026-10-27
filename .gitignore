@@ -14,3 +14,10 @@ captures/
 *.apk
 *.aab
 core/heif/src/main/cpp/vendor/
+# Keystore signing files & credentials
+*.jks
+*.keystore
+*.jceks
+keystore.properties
+keystore/release.jks
+keystore/keystore.properties

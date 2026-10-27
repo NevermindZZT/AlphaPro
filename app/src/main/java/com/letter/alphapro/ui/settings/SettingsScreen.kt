@@ -34,8 +34,6 @@ import com.letter.alphapro.ui.theme.AlphaOrangePrimary
 import com.letter.alphapro.viewmodel.CameraViewModel
 
 private const val GITHUB_REPO_URL = "https://github.com/NevermindZZT/AlphaPro"
-private const val APP_VERSION = "1.0.0"
-private const val APP_BUILD = 1
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,8 +86,8 @@ fun SettingsScreen(
         ) {
             // 1. Project Hero Card & Version Display
             ProjectHeroCard(
-                version = APP_VERSION,
-                build = APP_BUILD,
+                version = com.letter.alphapro.BuildConfig.VERSION_NAME,
+                build = com.letter.alphapro.BuildConfig.VERSION_CODE,
                 repoUrl = GITHUB_REPO_URL,
                 onOpenRepo = {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_REPO_URL))
