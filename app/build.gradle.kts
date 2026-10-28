@@ -30,6 +30,11 @@ val computedVersionName = "$versionMajor.$versionMinor.$versionPatch.$commitCoun
 // Format: 1 00 00 0007 -> 100000007 (Major * 100_000_000 + Minor * 1_000_000 + Patch * 10_000 + commitCount)
 val computedVersionCode = versionMajor * 100_00_0000 + versionMinor * 100_0000 + versionPatch * 10000 + commitCount
 
+// Android/Compose regression tests are deliberately excluded from ordinary JVM test runs.
+val androidUiRegression = providers.gradleProperty("androidUiRegression")
+    .map { it.toBoolean() }
+    .getOrElse(false)
+
 android {
     namespace = "com.letter.alphapro"
     compileSdk = 37
@@ -99,6 +104,21 @@ android {
         compose = true
         buildConfig = true
     }
+    if (androidUiRegression) {
+        sourceSets.getByName("test").java.srcDir("src/androidRuntimeTest/java")
+        testOptions {
+            unitTests.isIncludeAndroidResources = true
+            unitTests.all {
+                val testHome = rootProject.file(".gradle/robolectric")
+                it.systemProperty("user.home", testHome.absolutePath)
+                it.systemProperty("maven.repo.local", testHome.resolve("repository").absolutePath)
+                it.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
+                it.systemProperty("sun.net.client.defaultConnectTimeout", "15000")
+                it.systemProperty("sun.net.client.defaultReadTimeout", "60000")
+                it.doFirst { testHome.mkdirs() }
+            }
+        }
+    }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -132,5 +152,10 @@ dependencies {
     implementation(libs.coil.compose)
 
     testImplementation("junit:junit:4.13.2")
+    if (androidUiRegression) {
+        testImplementation("org.robolectric:robolectric:4.12.2")
+        testImplementation("androidx.compose.ui:ui-test-junit4")
+        debugImplementation("androidx.compose.ui:ui-test-manifest")
+    }
     debugImplementation(libs.androidx.ui.tooling)
 }

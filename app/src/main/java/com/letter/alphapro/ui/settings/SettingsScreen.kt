@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -40,6 +41,7 @@ import com.letter.alphapro.ui.components.AlphaOutlinedButton
 import com.letter.alphapro.ui.components.AlphaSegmentedButton
 import com.letter.alphapro.ui.components.AlphaSingleChoiceSegmentedButtonRow
 import com.letter.alphapro.ui.components.AlphaTextButton
+import com.letter.alphapro.ui.onboarding.OnboardingActivity
 import com.letter.alphapro.ui.theme.AlphaOrangePrimary
 import com.letter.alphapro.viewmodel.CameraViewModel
 
@@ -63,10 +65,13 @@ fun SettingsScreen(
     val autoWake by viewModel.autoWake.collectAsState()
 
     var showClearDialog by remember { mutableStateOf(false) }
+    var onboardingReport by remember { mutableStateOf<String?>(null) }
+    val onboardingTrace = remember(context) { com.letter.alphapro.data.OnboardingTrace(context) }
 
-    Scaffold(
-        modifier = modifier,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+    Box(modifier = modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = {
@@ -374,7 +379,64 @@ fun SettingsScreen(
                 }
             }
 
-            // 6. About & Open Source Credits
+            // 6. Help & Core Feature Walkthrough
+            SettingsSectionHeader(title = stringResource(R.string.settings_help_and_guide), icon = Icons.Rounded.Explore)
+            SettingsCard {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                onboardingTrace.record("settings_launch_replay_activity")
+                                context.startActivity(OnboardingActivity.replayIntent(context))
+                            }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.AutoStories,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.settings_onboarding_title),
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                text = stringResource(R.string.settings_onboarding_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowForwardIos,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    AlphaTextButton(onClick = { onboardingReport = onboardingTrace.report() }) {
+                        Text(stringResource(R.string.onboarding_diagnostics_title))
+                    }
+                }
+            }
+
+            // 7. About & Open Source Credits
             SettingsSectionHeader(title = stringResource(R.string.settings_about), icon = Icons.Rounded.Info)
             SettingsCard {
                 Column(
@@ -454,6 +516,30 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+
+    onboardingReport?.let { report ->
+        AlertDialog(
+            onDismissRequest = { onboardingReport = null },
+            title = { Text(stringResource(R.string.onboarding_diagnostics_title)) },
+            text = {
+                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.onboarding_diagnostics_privacy), style = MaterialTheme.typography.bodySmall)
+                    Text(report, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                }
+            },
+            confirmButton = {
+                AlphaTextButton(onClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.onboarding_diagnostics_title), report))
+                }) { Text(stringResource(R.string.onboarding_diagnostics_copy)) }
+            },
+            dismissButton = {
+                AlphaTextButton(onClick = { onboardingReport = null }) { Text(stringResource(R.string.onboarding_close)) }
+            }
+        )
+    }
     }
 }
 

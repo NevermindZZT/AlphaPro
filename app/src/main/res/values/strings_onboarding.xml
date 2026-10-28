@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_skip">Later</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_prev">Previous</string>
+    <string name="onboarding_start">Get Started</string>
+    <string name="onboarding_done">Done</string>
+    <string name="onboarding_close">Close</string>
+
+    <string name="settings_help_and_guide">Help &amp; Guides</string>
+    <string name="settings_onboarding_title">Feature Walkthrough</string>
+    <string name="settings_onboarding_description">Review core features and user guide</string>
+
+    <!-- Page 1: GPS Heartbeat & Time Sync -->
+    <string name="onboarding_page1_badge">Background Daemon · Always Connected</string>
+    <string name="onboarding_page1_title">Reliable GPS &amp; Clock Sync</string>
+    <string name="onboarding_page1_desc">A 5-second periodic heartbeat keeps the connection alive, preventing disconnections and red warning icons. System-level presence sensing wakes the service automatically, embedding accurate coordinates and microsecond-aligned timestamps into every shot.</string>
+    <string name="onboarding_page1_feat1">5-second heartbeat prevents disconnections</string>
+    <string name="onboarding_page1_feat2">Microsecond CC13 camera clock synchronization</string>
+    <string name="onboarding_page1_feat3">Offline GPX track recording and export</string>
+    <string name="onboarding_anim_heartbeat">5s Heartbeat</string>
+    <string name="onboarding_anim_time_sync">µs Sync</string>
+    <string name="onboarding_anim_camera_label">Alpha Camera</string>
+
+    <!-- Page 2: Gallery & 10-bit HEIF Transcoding -->
+    <string name="onboarding_page2_badge">Fast Browsing · Lossless Transcoding</string>
+    <string name="onboarding_page2_title">Full-Screen Gallery &amp; 10-bit HEIF</string>
+    <string name="onboarding_page2_desc">Browse camera storage smoothly via PTP/IP with intelligent RAW + HIF dual-format clustering. An immersive full-screen dark gallery supports pinch-to-zoom for focus inspection, with built-in multi-core libde265 transcoding preserving full EXIF metadata.</string>
+    <string name="onboarding_page2_feat1">RAW + JPG / HIF smart cluster cards</string>
+    <string name="onboarding_page2_feat2">Dark gallery with pinch zoom for focus checks</string>
+    <string name="onboarding_page2_feat3">10-bit 4:2:2 HEIF export to high-quality JPEG</string>
+    <string name="onboarding_anim_raw_badge">RAW + 10b HIF</string>
+    <string name="onboarding_anim_heif_to_jpeg">10-bit HEIF → JPEG (95%)</string>
+
+    <!-- Page 3: Wireless Shutter & Advanced Modes -->
+    <string name="onboarding_page3_badge">Low-Power BLE · Pro Remote</string>
+    <string name="onboarding_page3_title">Wireless Shutter &amp; Advanced Modes</string>
+    <string name="onboarding_page3_desc">Faithfully restores two-stage physical press timing: half-press AF lock, hold to burst and release to stop. Native Sony Bluetooth protocol support for BULB long exposure (both hold and timer modes), phone-scheduled intervalometer, and movie recording.</string>
+    <string name="onboarding_page3_feat1">Two-stage AF lock and hold-to-burst</string>
+    <string name="onboarding_page3_feat2">Bluetooth BULB exposure (Hold &amp; Timer)</string>
+    <string name="onboarding_page3_feat3">Fine parameter slider and dedicated movie REC</string>
+    <string name="onboarding_anim_af_lock">AF Locked</string>
+    <string name="onboarding_anim_burst_mode">Burst Mode</string>
+    <string name="onboarding_anim_bulb_timer">BULB Exposure</string>
+
+    <!-- Page 4: Instant Wi-Fi & Live FTP Tether -->
+    <string name="onboarding_page4_badge">One-Tap Connect · Live Preview</string>
+    <string name="onboarding_page4_title">Instant Wi-Fi &amp; Live FTP Tether</string>
+    <string name="onboarding_page4_desc">Bluetooth automatically negotiates credentials for instant connection to camera 5GHz/2.4GHz Wi-Fi. A lightweight local FTP server transfers photos as you shoot for immediate large-screen review, streamlining your studio and location workflow.</string>
+    <string name="onboarding_page4_feat1">Auto credential exchange for one-tap Wi-Fi</string>
+    <string name="onboarding_page4_feat2">Built-in lightweight local FTP server</string>
+    <string name="onboarding_page4_feat3">Instant photo review as you shoot</string>
+    <string name="onboarding_anim_wifi_speed">5GHz Wi-Fi</string>
+    <string name="onboarding_anim_ftp_live">FTP Live Server</string>
+    <string name="onboarding_diagnostics_title">Onboarding launch log</string>
+    <string name="onboarding_diagnostics_copy">Copy log</string>
+    <string name="onboarding_diagnostics_privacy">Recorded locally: app build, lifecycle, guide actions, input event types and accessibility state. No typed text, location, camera identifiers or credentials.</string>
+    <string name="onboarding_save_failed">Could not save setup completion. Please try again.</string>
+    <string name="onboarding_skip_confirm_title">Leave the walkthrough?</string>
+    <string name="onboarding_skip_confirm_message">Confirm to enter the app. You can revisit this guide in Settings → Help &amp; Guides.</string>
+    <string name="onboarding_skip_confirm_action">Enter app</string>
+    <string name="onboarding_skip_continue">Keep reading</string>
+</resources>

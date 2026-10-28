@@ -117,6 +117,15 @@ class CameraPreferences(context: Context) {
         get() = prefs.getBoolean("auto_wake_on_camera_power_on", true)
         set(value) = prefs.edit().putBoolean("auto_wake_on_camera_power_on", value).apply()
 
+    // A revisioned key intentionally ignores O1/O2's potentially accidental completion flag.
+    var completedOnboardingRevision: Int
+        get() = prefs.getInt("onboarding_completed_revision", 0)
+        set(value) {
+            check(prefs.edit().putInt("onboarding_completed_revision", value).commit()) {
+                "Unable to save onboarding completion"
+            }
+        }
+
     fun clearPairedDevice() {
         prefs.edit()
             .remove("paired_device_address")
