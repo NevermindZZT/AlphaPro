@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="parameter_settings_a11y">Edit %1$s</string>
+    <string name="parameter_dialog_title">Set %1$s</string>
+    <string name="parameter_value_label">Value</string>
+    <string name="parameter_range">Allowed range: %1$d–%2$d</string>
+    <string name="parameter_confirm">Confirm</string>
+    <string name="parameter_cancel">Cancel</string>
+    <string name="parameter_error_whole_number">Enter a valid whole number.</string>
+    <string name="parameter_error_minimum">Enter a value of at least %1$d.</string>
+    <string name="parameter_error_maximum">Enter a value no greater than %1$d.</string>
+</resources>

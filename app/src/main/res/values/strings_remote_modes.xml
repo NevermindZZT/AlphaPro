@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="remote_modes_stopping">Stopping and requesting release…</string>
+    <string name="remote_modes_movie_start">Toggle movie: start</string>
+    <string name="remote_modes_movie_stop">Toggle movie: stop</string>
+    <string name="remote_modes_release_warning">Shutter or AF release could not be confirmed. Check the camera and release the shutter or AF on the camera if needed. The button below only clears this app warning; it does not confirm that release succeeded.</string>
+    <string name="remote_modes_checked_camera">I checked the camera</string>
+</resources>

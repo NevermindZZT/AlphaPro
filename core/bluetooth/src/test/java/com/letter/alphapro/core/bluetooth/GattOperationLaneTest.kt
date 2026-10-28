@@ -7,6 +7,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -269,6 +271,217 @@ class GattOperationLaneTest {
         lane.activate(connection)
         assertUnavailable(Any())
         assertSynchronousSuccess(connection)
+    }
+
+    @Test
+    fun settlingAcceptedOperationSurvivesCancellationAndCrossThreadCallback() = runBlocking {
+        lane.activate(connection)
+        val recorded = CompletableDeferred<GattOperationResult>()
+        val operation = launch(start = CoroutineStart.UNDISPATCHED) {
+            val result = lane.execute(
+                connection, GattOperationKind.WRITE, attribute,
+                timeoutMs = 2_000, settleAfterInitiation = true
+            ) { true }
+            // A cancelled Deferred cannot expose this result through await(); record it in-body.
+            recorded.complete(result)
+        }
+        var nextInitiated = false
+        val queued = async(start = CoroutineStart.UNDISPATCHED) {
+            lane.execute(connection, GattOperationKind.READ, attribute) {
+                nextInitiated = true
+                assertTrue(lane.complete(connection, GattOperationKind.READ, attribute, 0))
+                true
+            }
+        }
+
+        operation.cancel()
+        assertFalse(operation.isCompleted)
+        assertFalse(nextInitiated)
+        assertTrue(lane.isActive(connection))
+        withContext(Dispatchers.Default) {
+            assertTrue(lane.complete(connection, GattOperationKind.WRITE, attribute, 0, byteArrayOf(7)))
+        }
+        val result = withTimeout(2_000) { recorded.await() }
+        assertEquals(0, result.status)
+        assertArrayEquals(byteArrayOf(7), result.value)
+        withTimeout(2_000) {
+            operation.join()
+            assertEquals(0, queued.await().status)
+        }
+        assertTrue(operation.isCancelled)
+        assertTrue(nextInitiated)
+        assertTrue(lane.isActive(connection))
+        assertSynchronousSuccess(connection)
+    }
+
+    @Test
+    fun settlingResultIsRecordedBeforeOriginalCallerCancellationCheckAndFinally() = runBlocking {
+        lane.activate(connection)
+        val recorded = CompletableDeferred<GattOperationResult>()
+        var cancellationObserved = false
+        var finallyRan = false
+        var passedCancellationCheck = false
+        val operation = launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                val result = lane.execute(
+                    connection, GattOperationKind.WRITE, attribute,
+                    timeoutMs = 2_000, settleAfterInitiation = true
+                ) { true }
+                recorded.complete(result)
+                currentCoroutineContext().ensureActive()
+                passedCancellationCheck = true
+            } catch (error: CancellationException) {
+                cancellationObserved = true
+                throw error
+            } finally {
+                finallyRan = true
+            }
+        }
+        operation.cancel()
+        assertTrue(lane.complete(connection, GattOperationKind.WRITE, attribute, 0))
+        assertEquals(0, withTimeout(2_000) { recorded.await() }.status)
+        withTimeout(2_000) { operation.join() }
+        assertTrue(cancellationObserved)
+        assertTrue(finallyRan)
+        assertFalse(passedCancellationCheck)
+        assertTrue(lane.isActive(connection))
+        assertSynchronousSuccess(connection)
+    }
+
+    @Test
+    fun settlingCancellationDuringAcceptedInitiationReturnsSynchronousCallback() = runBlocking {
+        lane.activate(connection)
+        var recordedStatus: Int? = null
+        val operation = launch(start = CoroutineStart.UNDISPATCHED) {
+            recordedStatus = lane.execute(
+                connection, GattOperationKind.WRITE, attribute, settleAfterInitiation = true
+            ) {
+                assertTrue(lane.complete(connection, GattOperationKind.WRITE, attribute, 0))
+                cancel("cancelled while initiating")
+                true
+            }.status
+        }
+        withTimeout(2_000) { operation.join() }
+        assertEquals(0, recordedStatus ?: -1)
+        assertTrue(operation.isCancelled)
+        assertTrue(lane.isActive(connection))
+        assertSynchronousSuccess(connection)
+    }
+
+    @Test
+    fun settlingCancellationWhileQueuedNeverInitiatesOrPoisonsConnection() = runBlocking {
+        lane.activate(connection)
+        val first = async(start = CoroutineStart.UNDISPATCHED) {
+            lane.execute(connection, GattOperationKind.READ, attribute) { true }
+        }
+        var queuedInitiated = false
+        val queued = launch(start = CoroutineStart.UNDISPATCHED) {
+            lane.execute(
+                connection, GattOperationKind.WRITE, attribute, settleAfterInitiation = true
+            ) {
+                queuedInitiated = true
+                true
+            }
+        }
+        withTimeout(2_000) { queued.cancelAndJoin() }
+        assertFalse(queuedInitiated)
+        assertTrue(lane.isActive(connection))
+        assertTrue(lane.complete(connection, GattOperationKind.READ, attribute, 0))
+        withTimeout(2_000) { first.await() }
+        assertFalse(queuedInitiated)
+        assertSynchronousSuccess(connection)
+    }
+
+    @Test
+    fun settlingAlreadyCancelledCallerNeverInitiatesOrPoisonsConnection() = runBlocking {
+        lane.activate(connection)
+        var initiated = false
+        val operation = launch(start = CoroutineStart.UNDISPATCHED) {
+            cancel("cancelled before initiating")
+            lane.execute(
+                connection, GattOperationKind.WRITE, attribute, settleAfterInitiation = true
+            ) {
+                initiated = true
+                true
+            }
+        }
+        withTimeout(2_000) { operation.join() }
+        assertTrue(operation.isCancelled)
+        assertFalse(initiated)
+        assertTrue(lane.isActive(connection))
+        assertSynchronousSuccess(connection)
+    }
+
+    @Test
+    fun settlingCancelledOperationStillRequiresExactCallbackMatch() = runBlocking {
+        val active = EqualToken(1)
+        val impostor = EqualToken(1)
+        lane.activate(active)
+        val recorded = CompletableDeferred<GattOperationResult>()
+        val operation = launch(start = CoroutineStart.UNDISPATCHED) {
+            recorded.complete(lane.execute(
+                active, GattOperationKind.WRITE, attribute,
+                timeoutMs = 2_000, settleAfterInitiation = true
+            ) { true })
+        }
+        operation.cancel()
+        withContext(Dispatchers.Default) {
+            assertFalse(lane.complete(impostor, GattOperationKind.WRITE, attribute, 0))
+            assertFalse(lane.complete(active, GattOperationKind.READ, attribute, 0))
+            assertFalse(lane.complete(active, GattOperationKind.DESCRIPTOR, attribute, 0))
+            assertFalse(lane.complete(active, GattOperationKind.WRITE, "other-uuid:7", 0))
+            assertFalse(lane.complete(active, GattOperationKind.WRITE, "characteristic-uuid:8", 0))
+        }
+        assertFalse(recorded.isCompleted)
+        assertFalse(operation.isCompleted)
+        withContext(Dispatchers.Default) {
+            assertTrue(lane.complete(active, GattOperationKind.WRITE, attribute, 133))
+            assertFalse(lane.complete(active, GattOperationKind.WRITE, attribute, 0))
+        }
+        assertEquals(133, withTimeout(2_000) { recorded.await() }.status)
+        withTimeout(2_000) { operation.join() }
+        assertTrue(lane.isActive(active))
+        assertSynchronousSuccess(active)
+    }
+
+    @Test
+    fun settlingRejectedInitiationClearsPendingAndAllowsRetry() = runBlocking {
+        lane.activate(connection)
+        val failure = expectFailure<GattOperationException> {
+            lane.execute(
+                connection, GattOperationKind.WRITE, attribute, settleAfterInitiation = true
+            ) { false }
+        }
+        assertEquals("GATT operation initiation rejected", failure.message)
+        assertFalse(lane.complete(connection, GattOperationKind.WRITE, attribute, 0))
+        assertTrue(lane.isActive(connection))
+        assertSynchronousSuccess(connection)
+    }
+
+    @Test
+    fun settlingTimeoutStillPoisonsConnectionEvenAfterCallerCancellation() = runBlocking {
+        lane.activate(connection)
+        val recorded = CompletableDeferred<Throwable?>()
+        val operation = launch(start = CoroutineStart.UNDISPATCHED) {
+            recorded.complete(runCatching {
+                lane.execute(
+                    connection, GattOperationKind.WRITE, attribute,
+                    timeoutMs = 25, settleAfterInitiation = true
+                ) { true }
+            }.exceptionOrNull())
+        }
+        operation.cancel()
+        val failure = withTimeout(2_000) { recorded.await() }
+        withTimeout(2_000) { operation.join() }
+        assertTrue(failure is GattOperationException)
+        assertEquals("GATT operation timed out", failure?.message)
+        assertFalse(lane.isActive(connection))
+        assertFalse(lane.complete(connection, GattOperationKind.WRITE, attribute, 0))
+        lane.activate(connection)
+        assertUnavailable(connection)
+        val replacement = Any()
+        lane.activate(replacement)
+        assertSynchronousSuccess(replacement)
     }
 
     private suspend fun assertUnavailable(token: Any) {

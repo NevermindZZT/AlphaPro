@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="remote_modes_stopping">正在停止并请求释放…</string>
+    <string name="remote_modes_movie_start">切换视频：开始</string>
+    <string name="remote_modes_movie_stop">切换视频：停止</string>
+    <string name="remote_modes_release_warning">无法确认快门或 AF 已释放。请检查相机，必要时在相机上手动释放快门或 AF。下方按钮仅清除此应用的警告，并不代表已确认释放成功。</string>
+    <string name="remote_modes_checked_camera">我已检查相机</string>
+</resources>

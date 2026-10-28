@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="remote_runtime_not_connected">Wait for the camera Bluetooth handshake to finish.</string>
+    <string name="remote_runtime_command_failed">The remote command or key release failed. The camera may not have acted; check the body settings and do not retry an uncertain exposure blindly.</string>
+    <string name="remote_runtime_release_unknown">Key release could not be confirmed. Check the camera before starting another operation.</string>
+    <string name="remote_runtime_bulb_unknown">BULB start or end is uncertain. Releasing keys alone does not end Bluetooth BULB. Check the camera and end exposure on the body if needed; do not blindly send another start/stop press.</string>
+    <string name="remote_runtime_invalid_config">Check the duration, interval and trigger-count limits.</string>
+    <string name="remote_runtime_exit_blocked">Stop the current remote operation first. If release or BULB is uncertain, check the camera and acknowledge the warning before leaving.</string>
+</resources>

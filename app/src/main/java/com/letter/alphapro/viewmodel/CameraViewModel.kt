@@ -56,7 +56,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
 
     val prefs = CameraPreferences(application)
     val gattManager = (application as AlphaProApplication).gattManager
-    val shutterController = SonyRemoteShutterController(gattManager)
+    val shutterController = SonyRemoteShutterController(gattManager, clockMillis = { android.os.SystemClock.elapsedRealtime() })
     val wifiConnector = CameraWifiSpecifierConnector(application)
     val ptpClient = PtpIpClient()
     val ptpDownloader = PtpPhotoDownloader(application, ptpClient)
@@ -87,8 +87,15 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
 
     private var wifiJob: Job? = null
     private var scanJob: Job? = null
-    private var bulbJob: Job? = null
-    private var intervalJob: Job? = null
+    private var remoteJob: Job? = null
+    private var remoteStartedAt = 0L
+    private var remoteNextAt = 0L
+    private data class RemotePress(val token: Long, val signal: CompletableDeferred<Unit>)
+    private var activeRemotePress: RemotePress? = null
+    private var remotePressCounter = 0L
+    private var manualAfSession: Any? = null
+    private val _remoteShooting = MutableStateFlow(RemoteShootingUiState())
+    val remoteShooting = _remoteShooting.asStateFlow()
 
     private val photoLoader = com.letter.alphapro.ui.gallery.CameraPhotoLoader(ptpClient, viewModelScope)
     val thumbnails = photoLoader.thumbnails
@@ -124,12 +131,23 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         // Collect BLE connection state
         viewModelScope.launch {
             gattManager.connectionState.collect { state ->
+                if (state !is SonyBleConnectionState.Ready) {
+                    remoteJob?.cancel()
+                    _remoteShooting.update { it.copy(afRequested = false, recording = null, cameraShutterActive = null, cameraFocusAcquired = null) }
+                }
                 _uiState.update { current ->
                     current.copy(
                         bleState = state,
                         pairedName = if (state is SonyBleConnectionState.Ready) state.deviceName else current.pairedName
                     )
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            gattManager.remoteFeedback.collect { feedback ->
+                _remoteShooting.update { it.copy(recording = feedback.recording,
+                    cameraShutterActive = feedback.shutterActive, cameraFocusAcquired = feedback.focusAcquired) }
             }
         }
 
@@ -414,37 +432,202 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.copy(userNotice = null) }
     }
 
-    // Remote Shutter Operations
-    fun halfPressAfDown() = viewModelScope.launch { shutterController.halfPressAfDown() }
-    fun halfPressAfUp() = viewModelScope.launch { shutterController.halfPressAfUp() }
-    fun takePhoto() = viewModelScope.launch { shutterController.takePhoto() }
-    fun toggleMovieRecording() = viewModelScope.launch { shutterController.toggleMovieRecording() }
-
-    fun toggleBulb() {
-        if (_uiState.value.isBulbActive) {
-            bulbJob?.cancel()
-            viewModelScope.launch { shutterController.stopBulb() }
-            _uiState.update { it.copy(isBulbActive = false) }
-        } else {
-            _uiState.update { it.copy(isBulbActive = true, bulbElapsedSeconds = 0) }
-            bulbJob = viewModelScope.launch {
-                shutterController.startBulb()
+    // Remote ownership is separate from the GPS/GATT lane. Transport ACK != saved image.
+    private fun launchRemote(
+        mode: RemoteOperationMode, durationSeconds: Int = 0, total: Int = 0, manualHold: Boolean = false,
+        action: suspend () -> Boolean
+    ): Boolean {
+        if (_remoteShooting.value.isBusy || remoteJob?.isActive == true || _remoteShooting.value.releaseUnconfirmed) return false
+        val session = gattManager.remoteSessionToken()
+        if (session == null) {
+            _remoteShooting.update { it.copy(error = com.letter.alphapro.ui.components.LocalizedText(R.string.remote_runtime_not_connected)) }
+            return false
+        }
+        remoteStartedAt = 0L; remoteNextAt = 0L
+        _remoteShooting.update { it.copy(mode = mode, phase = RemoteOperationPhase.STARTING,
+            elapsedSeconds = 0, remainingSeconds = durationSeconds, submittedTriggers = 0,
+            totalTriggers = total, nextTriggerSeconds = 0, manualHold = manualHold, shutterPressAccepted = false, error = null) }
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            val owner = currentCoroutineContext()[Job]
+            var accepted = false
+            var cancelled = false
+            val timer = launch {
                 while (isActive) {
-                    delay(1000)
-                    _uiState.update { it.copy(bulbElapsedSeconds = it.bulbElapsedSeconds + 1) }
+                    delay(200)
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    if (remoteStartedAt > 0L) {
+                        val elapsed = ((now - remoteStartedAt) / 1000).toInt().coerceAtLeast(0)
+                        val next = if (remoteNextAt > now) ((remoteNextAt - now + 999) / 1000).toInt() else 0
+                        _remoteShooting.update { it.copy(elapsedSeconds = elapsed,
+                            remainingSeconds = (durationSeconds - elapsed).coerceAtLeast(0), nextTriggerSeconds = next) }
+                    }
                 }
             }
+            try {
+                if (gattManager.remoteSessionToken() !== session) throw CancellationException("Remote session replaced")
+                accepted = action()
+                if (!accepted) _remoteShooting.update { it.copy(error = com.letter.alphapro.ui.components.LocalizedText(R.string.remote_runtime_command_failed)) }
+            } catch (cancel: CancellationException) {
+                cancelled = true
+                throw cancel
+            } catch (_: Exception) {
+                _remoteShooting.update { it.copy(error = com.letter.alphapro.ui.components.LocalizedText(R.string.remote_runtime_command_failed)) }
+            } finally {
+                timer.cancel()
+                withContext(NonCancellable) {
+                    _remoteShooting.update { it.copy(phase = RemoteOperationPhase.STOPPING) }
+                    val needsCleanup = cancelled || !accepted
+                    val released = if (needsCleanup) shutterController.releaseAll(expectedSession = session) else true
+                    val uncertain = _remoteShooting.value.releaseUnconfirmed || (needsCleanup && !released)
+                    if (uncertain) _uiState.update { it.copy(userNotice = text(
+                        if (mode == RemoteOperationMode.BULB) R.string.remote_runtime_bulb_unknown else R.string.remote_runtime_release_unknown)) }
+                    val captureMode = mode in listOf(RemoteOperationMode.SINGLE, RemoteOperationMode.BURST, RemoteOperationMode.BULB, RemoteOperationMode.INTERVAL)
+                    val finalElapsed = if (remoteStartedAt > 0L) ((android.os.SystemClock.elapsedRealtime() - remoteStartedAt) / 1000).toInt().coerceAtLeast(0) else 0
+                    if (captureMode || needsCleanup) manualAfSession = null
+                    _remoteShooting.update { it.copy(phase = RemoteOperationPhase.IDLE, nextTriggerSeconds = 0,
+                        elapsedSeconds = finalElapsed, remainingSeconds = (durationSeconds - finalElapsed).coerceAtLeast(0),
+                        afRequested = if (captureMode || needsCleanup) false else it.afRequested,
+                        releaseUnconfirmed = uncertain,
+                        error = if (uncertain && it.error == null) com.letter.alphapro.ui.components.LocalizedText(R.string.remote_runtime_release_unknown) else it.error) }
+                    if (remoteJob === owner) remoteJob = null
+                }
+            }
+        }
+        remoteJob = job
+        job.start()
+        return true
+    }
+
+    private fun markRemoteRunning() {
+        remoteStartedAt = android.os.SystemClock.elapsedRealtime()
+        _remoteShooting.update { it.copy(phase = if (it.phase == RemoteOperationPhase.STOPPING) it.phase else RemoteOperationPhase.RUNNING, shutterPressAccepted = true) }
+    }
+
+    fun takePhoto() = launchRemote(RemoteOperationMode.SINGLE) {
+        shutterController.takePhoto()
+    }
+
+    fun toggleAfLock() {
+        if (_remoteShooting.value.afRequested) halfPressAfUp() else halfPressAfDown()
+    }
+    fun halfPressAfDown() = launchRemote(RemoteOperationMode.AF) {
+        val session = gattManager.remoteSessionToken()
+        val result = shutterController.halfPressAfDown()
+        if (result) { manualAfSession = session; _remoteShooting.update { it.copy(afRequested = true) } }
+        result
+    }
+    fun halfPressAfUp() = launchRemote(RemoteOperationMode.AF) {
+        val result = shutterController.halfPressAfUp()
+        if (result) { manualAfSession = null; _remoteShooting.update { it.copy(afRequested = false) } }
+        result
+    }
+    fun toggleMovieRecording() = launchRemote(RemoteOperationMode.MOVIE) {
+        // Keep the verified toggle pulse. Only FF02 feedback changes recording UI state.
+        shutterController.toggleMovieRecording()
+    }
+
+    /** Returns a per-gesture ownership token; a stale finger-up cannot stop a newer operation. */
+    fun pressBurst(): Long? = beginRemotePress(RemoteOperationMode.BURST)
+    fun pressBulb(): Long? = beginRemotePress(RemoteOperationMode.BULB)
+
+    private fun beginRemotePress(mode: RemoteOperationMode): Long? {
+        if (_remoteShooting.value.isBusy || remoteJob?.isActive == true || _remoteShooting.value.releaseUnconfirmed) return null
+        val press = RemotePress(++remotePressCounter, CompletableDeferred())
+        activeRemotePress = press
+        val initialSession = gattManager.remoteSessionToken()
+        val baseline = gattManager.remoteFeedback.value.shutterSequence
+        val started = launchRemote(mode, manualHold = true) {
+            try {
+                val waitForRelease: suspend () -> Unit = {
+                    // Internal lost-input protection, not a user-configured burst duration.
+                    withTimeout(3_600_000L) { press.signal.await() }
+                }
+                if (mode == RemoteOperationMode.BURST) {
+                    shutterController.holdShutterUntilReleased(
+                        releaseRequested = { press.signal.isCompleted }, awaitRelease = waitForRelease,
+                        onHeld = ::markRemoteRunning)
+                } else {
+                    shutterController.runBulbFromPress(
+                        releaseRequested = { press.signal.isCompleted }, awaitRelease = waitForRelease,
+                        isExposureActive = { freshShutterActivity(initialSession, baseline) },
+                        onStarted = ::markRemoteRunning,
+                        onStopping = { _remoteShooting.update { it.copy(phase = RemoteOperationPhase.STOPPING) } },
+                        onUncertain = ::bulbUncertain)
+                }
+            } finally {
+                if (activeRemotePress?.token == press.token) activeRemotePress = null
+            }
+        }
+        if (!started && activeRemotePress?.token == press.token) activeRemotePress = null
+        return press.token.takeIf { started }
+    }
+
+    fun releaseRemotePress(token: Long) {
+        val press = activeRemotePress?.takeIf { it.token == token } ?: return
+        press.signal.complete(Unit)
+        // Before full-press acceptance, cancel queue waiting rather than firing after finger-up.
+        if (!_remoteShooting.value.shutterPressAccepted) stopRemoteShooting()
+    }
+
+    private fun freshShutterActivity(session: Any?, baseline: Long): Boolean? =
+        gattManager.remoteFeedback.value.takeIf {
+            gattManager.remoteSessionToken() === session && it.shutterSequence > baseline
+        }?.shutterActive
+
+    private fun bulbUncertain() {
+        _remoteShooting.update { it.copy(releaseUnconfirmed = true,
+            error = com.letter.alphapro.ui.components.LocalizedText(R.string.remote_runtime_bulb_unknown)) }
+    }
+
+    fun startTimedBulb(seconds: Int) {
+        if (seconds !in 1..3600) { remoteInvalidConfig(); return }
+        val initialSession = gattManager.remoteSessionToken()
+        val baseline = gattManager.remoteFeedback.value.shutterSequence
+        launchRemote(RemoteOperationMode.BULB, seconds) {
+            shutterController.runBulbFromPress(
+                durationMillis = seconds * 1000L,
+                isExposureActive = { freshShutterActivity(initialSession, baseline) },
+                onStarted = ::markRemoteRunning,
+                onStopping = { _remoteShooting.update { it.copy(phase = RemoteOperationPhase.STOPPING) } },
+                onUncertain = ::bulbUncertain)
         }
     }
 
     fun startIntervalometer(intervalSec: Int, totalShots: Int) {
-        intervalJob?.cancel()
-        intervalJob = viewModelScope.launch {
-            shutterController.executeIntervalometer(intervalSec, totalShots) { current, total ->
-                _uiState.update { it.copy(activeIntervalRemaining = total - current) }
-            }
-            _uiState.update { it.copy(activeIntervalRemaining = null, userNotice = text(R.string.runtime_interval_complete)) }
+        if (intervalSec !in 1..3600 || totalShots !in 1..999) { remoteInvalidConfig(); return }
+        launchRemote(RemoteOperationMode.INTERVAL, total = totalShots) {
+            markRemoteRunning()
+            shutterController.runIntervalometer(intervalSec, totalShots,
+                onTriggerSubmitted = { current, total -> _remoteShooting.update { it.copy(submittedTriggers = current, totalTriggers = total) } },
+                onNextTriggerAt = { remoteNextAt = it })
         }
+    }
+
+    private fun remoteInvalidConfig() {
+        _remoteShooting.update { it.copy(error = com.letter.alphapro.ui.components.LocalizedText(R.string.remote_runtime_invalid_config)) }
+    }
+
+    fun stopRemoteShooting() {
+        val current = remoteJob
+        if (current != null && _remoteShooting.value.isBusy) {
+            _remoteShooting.update { it.copy(phase = RemoteOperationPhase.STOPPING) }
+            activeRemotePress?.signal?.complete(Unit)
+            current.cancel()
+        }
+    }
+
+    fun onRemoteScreenLeft() {
+        val state = _remoteShooting.value
+        if (state.isLongRunning || (state.isBusy && state.mode == RemoteOperationMode.AF)) stopRemoteShooting()
+        else if (!state.isBusy && state.afRequested) halfPressAfUp()
+    }
+
+    fun notifyRemoteExitBlocked() {
+        _uiState.update { it.copy(userNotice = text(R.string.remote_runtime_exit_blocked)) }
+    }
+
+    fun acknowledgeRemoteWarning() {
+        if (!_remoteShooting.value.isBusy) _remoteShooting.update { it.copy(error = null, releaseUnconfirmed = false) }
     }
 
     private fun startLocationForegroundService(address: String) {
@@ -546,6 +729,17 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     override fun onCleared() {
+        val finishing = remoteJob
+        val afSession = manualAfSession
+        if (finishing != null || afSession != null) {
+            val cleanupScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+            cleanupScope.launch {
+                try {
+                    finishing?.cancelAndJoin()
+                    if (afSession != null) shutterController.releaseAll(expectedSession = afSession)
+                } finally { cleanupScope.cancel() }
+            }
+        }
         super.onCleared()
         ftpServer.stop()
         wifiConnector.release()

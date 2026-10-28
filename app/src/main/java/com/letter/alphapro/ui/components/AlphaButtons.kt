@@ -51,6 +51,21 @@ object AlphaButtonDefaults {
     val IconSpacing = 8.dp
     val IconTouchSize = 48.dp
     val Shape = CircleShape
+    val ShutterSize = 160.dp
+    val ShutterBorderWidth = 6.dp
+
+    @Composable
+    fun shutterColors(active: Boolean = false): ButtonColors = ButtonDefaults.filledTonalButtonColors(
+        containerColor = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+        contentColor = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary
+    )
+
+    @Composable
+    fun shutterBorderColor(enabled: Boolean, active: Boolean = false) = when {
+        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+        active -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.outline
+    }
 
     /** Reserve for destructive primary actions; Material owns disabled colors. */
     @Composable
@@ -290,25 +305,16 @@ fun AlphaShutterButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    active: Boolean = false,
     content: @Composable RowScope.() -> Unit
 ) {
     FilledTonalButton(
         onClick = onClick,
-        modifier = modifier.size(160.dp),
+        modifier = modifier.size(AlphaButtonDefaults.ShutterSize),
         enabled = enabled,
         shape = AlphaButtonDefaults.Shape,
-        colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            contentColor = MaterialTheme.colorScheme.primary
-        ),
-        border = BorderStroke(
-            width = 6.dp,
-            color = if (enabled) {
-                MaterialTheme.colorScheme.outline
-            } else {
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-            }
-        ),
+        colors = AlphaButtonDefaults.shutterColors(active),
+        border = BorderStroke(AlphaButtonDefaults.ShutterBorderWidth, AlphaButtonDefaults.shutterBorderColor(enabled, active)),
         contentPadding = actionPadding(AlphaButtonSize.Large),
         content = content
     )

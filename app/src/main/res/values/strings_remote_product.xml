@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="remote_product_single">Single</string>
+    <string name="remote_product_burst">Burst</string>
+    <string name="remote_product_bulb">BULB</string>
+    <string name="remote_product_interval">Interval</string>
+    <string name="remote_product_hold_mode">Hold</string>
+    <string name="remote_product_timer_mode">Timer</string>
+    <string name="remote_product_connected">Bluetooth connected</string>
+    <string name="remote_product_single_hint">Enable Bluetooth remote control on the camera. Drive and exposure settings remain under camera control.</string>
+    <string name="remote_product_burst_hint">Set the camera drive to Continuous Shooting. Hold the shutter to shoot; release to stop. Speed is determined by the camera.</string>
+    <string name="remote_product_bulb_hint">Set the camera to M and BULB with compatible shutter/drive settings, and turn off its BULB Timer. Hold starts exposure; release sends the end press. Timer mode ends at the planned time. This app does not change camera settings.</string>
+    <string name="remote_product_interval_hint">Use a non-BULB single-shot setting and turn off camera-native interval shooting. Allow time for exposure, processing and card writing.</string>
+    <string name="remote_product_duration">Exposure time</string>
+    <string name="remote_product_interval_seconds">Shooting interval</string>
+    <string name="remote_product_count">Trigger count</string>
+    <string name="remote_product_seconds">%1$d s</string>
+    <string name="remote_product_count_value">%1$d</string>
+    <string name="remote_product_clock">%1$02d:%2$02d</string>
+    <string name="remote_product_remaining">Planned time remaining: %1$d s</string>
+    <string name="remote_product_progress">%1$d / %2$d triggers sent</string>
+    <string name="remote_product_next">Next trigger in %1$d s</string>
+    <string name="remote_product_hold_burst">Hold to shoot</string>
+    <string name="remote_product_hold_bulb">Hold to expose</string>
+    <string name="remote_product_release_to_stop">Release to stop</string>
+    <string name="remote_product_start_timer">Start timer</string>
+    <string name="remote_product_start_interval">Start interval</string>
+    <string name="remote_product_stop">Stop</string>
+    <string name="remote_product_release_af">Release AF</string>
+    <string name="remote_product_focused">Camera reports focus acquired</string>
+    <string name="remote_product_stopping_short">Stopping…</string>
+    <string name="remote_product_foreground">Keep this page in the foreground. Leaving or locking stops the phone sequence and attempts to release/end the operation.</string>
+    <string name="remote_product_foreground_caution">If the connection or result is uncertain, check the camera. Trigger count does not confirm saved photos.</string>
+</resources>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="remote_product_single">单张</string>
+    <string name="remote_product_burst">连拍</string>
+    <string name="remote_product_bulb">B 门</string>
+    <string name="remote_product_interval">间隔</string>
+    <string name="remote_product_hold_mode">长按</string>
+    <string name="remote_product_timer_mode">定时</string>
+    <string name="remote_product_connected">蓝牙已联机</string>
+    <string name="remote_product_single_hint">请开启机身蓝牙遥控。驱动和曝光参数仍由相机设置决定。</string>
+    <string name="remote_product_burst_hint">请在机身选择连续拍摄驱动。按住快门连拍，松手停止，速度由相机决定。</string>
+    <string name="remote_product_bulb_hint">请在机身设为 M／BULB，使用兼容快门和驱动，并关闭机身 BULB 定时器。长按开始曝光，松手发送结束按键；定时按计划结束。应用不会更改机身设置。</string>
+    <string name="remote_product_interval_hint">请使用非 BULB 的单张设置，并关闭机身间隔拍摄。间隔需留出曝光、处理及写卡时间。</string>
+    <string name="remote_product_duration">曝光时长</string>
+    <string name="remote_product_interval_seconds">拍摄间隔</string>
+    <string name="remote_product_count">触发次数</string>
+    <string name="remote_product_seconds">%1$d 秒</string>
+    <string name="remote_product_count_value">%1$d 次</string>
+    <string name="remote_product_clock">%1$02d:%2$02d</string>
+    <string name="remote_product_remaining">计划剩余 %1$d 秒</string>
+    <string name="remote_product_progress">已触发 %1$d／%2$d 次</string>
+    <string name="remote_product_next">距离下次触发 %1$d 秒</string>
+    <string name="remote_product_hold_burst">按住连拍</string>
+    <string name="remote_product_hold_bulb">按住曝光</string>
+    <string name="remote_product_release_to_stop">松手停止</string>
+    <string name="remote_product_start_timer">开始定时</string>
+    <string name="remote_product_start_interval">开始间隔</string>
+    <string name="remote_product_stop">停止</string>
+    <string name="remote_product_release_af">释放半按</string>
+    <string name="remote_product_focused">机身已反馈合焦</string>
+    <string name="remote_product_stopping_short">正在停止</string>
+    <string name="remote_product_foreground">请保持此页前台。离开或锁屏会停止手机拍摄序列，并尝试释放／结束操作。</string>
+    <string name="remote_product_foreground_caution">断连或结果不明时，请检查机身。触发次数不代表照片已保存。</string>
+</resources>

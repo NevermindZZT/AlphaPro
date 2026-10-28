@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="remote_runtime_not_connected">请等待相机蓝牙完成握手。</string>
+    <string name="remote_runtime_command_failed">遥控指令或松键失败。机身可能未执行，请检查机身设置，不要盲目重试结果不确定的曝光。</string>
+    <string name="remote_runtime_release_unknown">无法确认按键已释放。开始下一次操作前请先检查机身。</string>
+    <string name="remote_runtime_bulb_unknown">B 门开始或结束状态不确定。单纯松键不能结束蓝牙 B 门，请检查机身，必要时在机身结束曝光；不要盲目再发开始／结束按键。</string>
+    <string name="remote_runtime_invalid_config">请检查时长、间隔和触发次数的范围。</string>
+    <string name="remote_runtime_exit_blocked">请先停止当前遥控操作；若松键或 B 门状态不确定，请检查机身并确认警告后再离开。</string>
+</resources>

@@ -34,6 +34,7 @@ enum class AlphaProDestination(@StringRes val titleRes: Int, val icon: ImageVect
 fun AlphaProApp(viewModel: CameraViewModel = viewModel()) {
     var currentDestination by rememberSaveable { mutableStateOf(AlphaProDestination.HUB) }
     val uiState by viewModel.uiState.collectAsState()
+    val remote by viewModel.remoteShooting.collectAsState()
     val viewingPhoto by viewModel.viewingPhoto.collectAsState()
     val preview by viewModel.photoPreview.collectAsState()
     val thumbnails by viewModel.thumbnails.collectAsState()
@@ -57,7 +58,11 @@ fun AlphaProApp(viewModel: CameraViewModel = viewModel()) {
                     AlphaProDestination.entries.forEach { destination ->
                         NavigationBarItem(
                             selected = currentDestination == destination,
-                            onClick = { currentDestination = destination },
+                            onClick = {
+                                if (currentDestination == AlphaProDestination.REMOTE && destination != currentDestination &&
+                                    (remote.isLongRunning || remote.releaseUnconfirmed)) viewModel.notifyRemoteExitBlocked()
+                                else currentDestination = destination
+                            },
                             icon = { Icon(destination.icon, stringResource(destination.titleRes)) },
                             label = { Text(stringResource(destination.titleRes)) }
                         )

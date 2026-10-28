@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="parameter_settings_a11y">编辑%1$s</string>
+    <string name="parameter_dialog_title">设置%1$s</string>
+    <string name="parameter_value_label">数值</string>
+    <string name="parameter_range">允许范围：%1$d–%2$d</string>
+    <string name="parameter_confirm">确认</string>
+    <string name="parameter_cancel">取消</string>
+    <string name="parameter_error_whole_number">请输入有效的整数。</string>
+    <string name="parameter_error_minimum">输入值不能小于%1$d。</string>
+    <string name="parameter_error_maximum">输入值不能大于%1$d。</string>
+</resources>

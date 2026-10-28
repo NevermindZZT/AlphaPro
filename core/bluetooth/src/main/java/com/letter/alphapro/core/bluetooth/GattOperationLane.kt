@@ -3,10 +3,12 @@ package com.letter.alphapro.core.bluetooth
 import java.util.IdentityHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 enum class GattOperationKind {
@@ -68,12 +70,20 @@ class GattOperationLane {
      *
      * [initiate] runs under the state lock so disconnect cannot race between registration and
      * initiation. It must be short and non-blocking; a synchronous [complete] is supported.
+     *
+     * [settleAfterInitiation] keeps queueing and the pre-initiation cancellation check cancellable,
+     * but once [initiate] returns true, waits non-cancellably for the matching callback within
+     * [timeoutMs]. Its result reaches the caller even if cancellation occurred, so the caller can
+     * record the accepted operation before its next cancellation check. This does not reactivate
+     * the caller's Job. A missing callback still invalidates the connection on timeout. By default,
+     * cancellation after acceptance instead abandons the operation and invalidates the connection.
      */
     suspend fun execute(
         connection: Any,
         kind: GattOperationKind,
         attribute: String,
         timeoutMs: Long = 15_000,
+        settleAfterInitiation: Boolean = false,
         initiate: () -> Boolean
     ): GattOperationResult {
         require(timeoutMs > 0) { "GATT operation timeout must be positive" }
@@ -94,8 +104,16 @@ class GattOperationLane {
                         throw GattOperationException("GATT operation initiation rejected")
                     }
                 }
-                context.ensureActive()
-                withTimeoutOrNull(timeoutMs) { operation.result.await() } ?: run {
+                val result = if (settleAfterInitiation) {
+                    // Keep the dispatcher unchanged: returning must not re-check caller cancellation.
+                    withContext(NonCancellable) {
+                        withTimeoutOrNull(timeoutMs) { operation.result.await() }
+                    }
+                } else {
+                    context.ensureActive()
+                    withTimeoutOrNull(timeoutMs) { operation.result.await() }
+                }
+                result ?: run {
                     invalidate(connection, "GATT operation timed out")
                     throw GattOperationException("GATT operation timed out")
                 }

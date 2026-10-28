@@ -7,7 +7,7 @@ const root = join(workspace, 'app/src/main/java/com/letter/alphapro/ui');
 const common = join(root, 'components/AlphaButtons.kt');
 const material = '(?:Button|OutlinedButton|FilledTonalButton|TextButton|IconButton|FilledIconButton|OutlinedIconButton|FilterChip|SegmentedButton|SingleChoiceSegmentedButtonRow)';
 const direct = new RegExp('(^|[^A-Za-z0-9_])' + material + '\\s*[(]', 'gm');
-const wrappers = /\bAlpha(?:Button|TonalButton|OutlinedButton|TextButton|IconButton|FilledIconButton|FilterChip|SegmentedButton|SingleChoiceSegmentedButtonRow|ShutterButton)\s*[(]/g;
+const wrappers = /\bAlpha(?:Button|TonalButton|OutlinedButton|TextButton|IconButton|FilledIconButton|FilterChip|SegmentedButton|SingleChoiceSegmentedButtonRow|ShutterButton|HoldShutterButton|ParameterSlider)\s*[(]/g;
 const problems = [];
 // Small contract probes keep the source guard honest without touching compiled Kotlin files.
 direct.lastIndex = 0;
@@ -55,6 +55,8 @@ async function walk(directory) {
     let local = 0;
     wrappers.lastIndex = 0;
     for (const hit of code.matchAll(wrappers)) {
+      // Declarations in reusable component files are not page call sites.
+      if (/fun\s*$/.test(code.slice(Math.max(0, hit.index - 80), hit.index))) continue;
       calls++; local++;
       const args = argumentsAt(code, hit.index + hit[0].lastIndexOf('('));
       if (args.some(value => /^\s*(?:shape|contentPadding)\s*=/.test(value))) {
