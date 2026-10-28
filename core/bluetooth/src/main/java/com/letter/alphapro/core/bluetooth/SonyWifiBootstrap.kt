@@ -24,9 +24,9 @@ internal class SonyWifiBootstrap(
     private val credentialPollMs: Long = 500
 ) {
     suspend fun prepare(): SonyWifiCredentials {
-        var stage = "检查蓝牙连接"
+        var stage = "Check Bluetooth connection"
         fun ready() {
-            if (!port.isReady()) throw SonyWifiSetupException("$stage：蓝牙连接已变化，请等待重新联机")
+            if (!port.isReady()) throw SonyWifiSetupException("$stage: Bluetooth session changed; wait for reconnect")
         }
         fun enter(value: String) { stage = value; report(value) }
         val result = withTimeoutOrNull(overallTimeoutMs) {
@@ -34,29 +34,29 @@ internal class SonyWifiBootstrap(
             for (uuid in listOf(SonyBleConstants.CHAR_WIFI_POWER_UUID,
                 SonyBleConstants.CHAR_WIFI_SSID_UUID, SonyBleConstants.CHAR_WIFI_PASSWORD_UUID)) {
                 if (!port.hasCharacteristic(uuid)) {
-                    throw SonyWifiSetupException("缺少特征 "+uuid.toString().take(8))
+                    throw SonyWifiSetupException("Missing characteristic "+uuid.toString().take(8))
                 }
             }
-            enter("准备 BLE MTU")
+            enter("Prepare BLE MTU")
             try { port.prepareMtu() }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { report("MTU 准备未成功，检查连接后继续") }
+            catch (_: Exception) { report("MTU preparation unavailable; verify session and continue") }
             ready()
             val statusUuid = SonyBleConstants.CHAR_CAMERA_STATUS_UUID
             val hasStatus = port.hasCharacteristic(statusUuid)
             if (hasStatus) {
-                enter("订阅并预读 CC09")
+                enter("Subscribe and preread CC09")
                 // Reference ordering; a missing optional CCCD does not prevent activation.
-                if (!port.subscribe(statusUuid)) report("CC09 通知订阅不可用，继续主动读取")
+                if (!port.subscribe(statusUuid)) report("CC09 subscription unavailable; continue explicit reads")
                 port.read(statusUuid)
             }
             ready()
-            enter("开启相机 Wi-Fi（CC08）")
+            enter("Activate camera Wi-Fi (CC08)")
             if (!port.write(SonyBleConstants.CHAR_WIFI_POWER_UUID, SonyBleConstants.CMD_WIFI_POWER_ON)) {
-                throw SonyWifiSetupException("CC08 开启 Wi-Fi 写入失败")
+                throw SonyWifiSetupException("CC08 Wi-Fi activation write failed")
             }
             if (hasStatus) {
-                enter("确认相机 Wi-Fi 状态（CC09）")
+                enter("Check camera Wi-Fi status (CC09)")
                 // Reference: unknown status ends the status probe, not the entire setup.
                 while (true) {
                     ready()
@@ -64,7 +64,7 @@ internal class SonyWifiBootstrap(
                     report("CC09 state=${status.first} error=${status.second}")
                     if (status.first == 2) break
                     if (status.first == 0 && status.second in 2..5) {
-                        throw SonyWifiSetupException("CC09 相机报告 Wi-Fi 启动错误，error=${status.second}")
+                        throw SonyWifiSetupException("CC09 camera Wi-Fi startup error=${status.second}")
                     }
                     delay(credentialPollMs)
                 }
@@ -80,20 +80,20 @@ internal class SonyWifiBootstrap(
                     delay(credentialPollMs)
                 }
             }
-            val ssid = credential(SonyBleConstants.CHAR_WIFI_SSID_UUID, "读取 SSID（CC06）", 1..32)
-            val password = credential(SonyBleConstants.CHAR_WIFI_PASSWORD_UUID, "读取密码（CC07）", 8..63)
+            val ssid = credential(SonyBleConstants.CHAR_WIFI_SSID_UUID, "Read SSID (CC06)", 1..32)
+            val password = credential(SonyBleConstants.CHAR_WIFI_PASSWORD_UUID, "Read password (CC07)", 8..63)
             var bssid: String? = null
             val bssidUuid = SonyBleConstants.CHAR_WIFI_BSSID_UUID
             if (port.hasCharacteristic(bssidUuid)) {
-                enter("读取可选 BSSID（CC0C）")
+                enter("Read optional BSSID (CC0C)")
                 try { bssid = port.read(bssidUuid)?.let(SonyWifiDataParser::parseAscii) }
                 catch (cancelled: CancellationException) { throw cancelled }
-                catch (_: Exception) { report("可选 BSSID 不可用") }
+                catch (_: Exception) { report("Optional BSSID unavailable") }
             }
             ready()
-            report("凭据读取完成（内容已脱敏）")
+            report("Credential read complete (contents redacted)")
             SonyWifiCredentials(ssid, password, bssid)
         }
-        return result ?: throw SonyWifiSetupException("$stage：总等待超过 ${overallTimeoutMs / 1000} 秒")
+        return result ?: throw SonyWifiSetupException("$stage: overall timeout after ${overallTimeoutMs / 1000} seconds")
     }
 }

@@ -12,6 +12,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.letter.alphapro.R
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -26,11 +29,11 @@ import com.letter.alphapro.ui.components.AlphaTonalButton
 import com.letter.alphapro.ui.theme.CameraActiveGreen
 import com.letter.alphapro.viewmodel.CameraViewModel
 
-enum class RemoteShootingMode(val label: String) {
-    SINGLE("单张"),
-    CONTINUOUS("连拍"),
-    BULB("B门长曝光"),
-    INTERVAL("延时摄影")
+enum class RemoteShootingMode(val labelRes: Int) {
+    SINGLE(R.string.control_mode_single),
+    CONTINUOUS(R.string.control_mode_continuous),
+    BULB(R.string.control_mode_bulb),
+    INTERVAL(R.string.control_mode_interval)
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -64,11 +67,11 @@ fun RemoteShutterScreen(
                 title = {
                     Column {
                         Text(
-                            text = "无线蓝牙快门",
+                            text = stringResource(R.string.control_remote_title),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                         )
                         Text(
-                            text = if (isBleReady) (uiState.pairedName ?: "索尼微单") + " · BLE 遥控就绪" else "蓝牙未连接",
+                            text = if (isBleReady) stringResource(R.string.control_remote_ready_camera, uiState.pairedName ?: stringResource(R.string.control_sony_camera)) else stringResource(R.string.control_bluetooth_disconnected),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -84,7 +87,7 @@ fun RemoteShutterScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (isBleReady) "已就绪" else "未联机",
+                            text = if (isBleReady) stringResource(R.string.control_ready) else stringResource(R.string.control_offline),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -120,7 +123,7 @@ fun RemoteShutterScreen(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "相机设置要求：请确认相机菜单 [网络] -> [Bluetooth] -> [Bluetooth遥控] 已设置为 [开]。",
+                        text = stringResource(R.string.control_remote_setup),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -136,7 +139,7 @@ fun RemoteShutterScreen(
                         index = index,
                         count = RemoteShootingMode.entries.size
                     ) {
-                        Text(text = mode.label)
+                        Text(text = stringResource(mode.labelRes))
                     }
                 }
             }
@@ -166,7 +169,7 @@ fun RemoteShutterScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = if (!isBleReady) "请先连接相机" else "按下拍照",
+                                text = if (!isBleReady) stringResource(R.string.control_connect_camera_first) else stringResource(R.string.control_take_photo),
                                 style = MaterialTheme.typography.labelLarge
                             )
                         }
@@ -187,7 +190,7 @@ fun RemoteShutterScreen(
                         ) {
                             Icon(Icons.Rounded.CenterFocusStrong, contentDescription = null, modifier = Modifier.size(AlphaButtonDefaults.IconSize))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(if (isAfPressed) "AF 锁定中" else "半按 AF")
+                            Text(if (isAfPressed) stringResource(R.string.control_af_locked) else stringResource(R.string.control_af_half_press))
                         }
 
                         AlphaButton(
@@ -208,7 +211,7 @@ fun RemoteShutterScreen(
                                 modifier = Modifier.size(AlphaButtonDefaults.IconSize)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(if (isRecordingVideo) "录像中 (REC)" else "录像开关")
+                            Text(if (isRecordingVideo) stringResource(R.string.control_video_recording) else stringResource(R.string.control_video_toggle))
                         }
                     }
                 }
@@ -223,16 +226,16 @@ fun RemoteShutterScreen(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
                     ) {
                         Column(modifier = Modifier.padding(18.dp)) {
-                            Text("B门长曝光控制器", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                            Text(stringResource(R.string.control_bulb_title), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("曝光持续时间", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(stringResource(R.string.control_exposure_duration), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(
-                                    text = uiState.bulbElapsedSeconds.toString() + " 秒",
+                                    text = pluralStringResource(R.plurals.control_seconds_elapsed, uiState.bulbElapsedSeconds, uiState.bulbElapsedSeconds),
                                     style = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -244,7 +247,7 @@ fun RemoteShutterScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = if (uiState.isBulbActive) AlphaButtonDefaults.destructiveColors() else ButtonDefaults.buttonColors()
                             ) {
-                                Text(if (uiState.isBulbActive) "结束长曝光" else "锁定开始长曝光")
+                                Text(if (uiState.isBulbActive) stringResource(R.string.control_bulb_stop) else stringResource(R.string.control_bulb_start))
                             }
                         }
                     }
@@ -256,10 +259,10 @@ fun RemoteShutterScreen(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
                     ) {
                         Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("高级延时连拍 (Intervalometer)", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                            Text(stringResource(R.string.control_interval_title), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("拍摄间隔: " + intervalSeconds.toString() + " 秒", style = MaterialTheme.typography.bodyMedium)
-                                Text("计划张数: " + totalIntervalShots.toString() + " 张", style = MaterialTheme.typography.bodyMedium)
+                                Text(pluralStringResource(R.plurals.control_interval_seconds, intervalSeconds, intervalSeconds), style = MaterialTheme.typography.bodyMedium)
+                                Text(pluralStringResource(R.plurals.control_planned_shots, totalIntervalShots, totalIntervalShots), style = MaterialTheme.typography.bodyMedium)
                             }
                             Slider(
                                 value = intervalSeconds.toFloat(),
@@ -269,7 +272,7 @@ fun RemoteShutterScreen(
                             )
                             if (uiState.activeIntervalRemaining != null) {
                                 Text(
-                                    text = "正在执行延时连拍... 剩余 " + uiState.activeIntervalRemaining.toString() + " 张",
+                                    text = pluralStringResource(R.plurals.control_interval_remaining, uiState.activeIntervalRemaining ?: 0, uiState.activeIntervalRemaining ?: 0),
                                     style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                 )
                             }
@@ -278,7 +281,7 @@ fun RemoteShutterScreen(
                                 enabled = isBleReady && uiState.activeIntervalRemaining == null,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(if (uiState.activeIntervalRemaining != null) "延时序列进行中" else "启动延时拍摄序列")
+                                Text(if (uiState.activeIntervalRemaining != null) stringResource(R.string.control_interval_running) else stringResource(R.string.control_interval_start))
                             }
                         }
                     }

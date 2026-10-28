@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppCompat supplies per-app locale support on API26-32; all content remains Compose. -->
+    <style name="Theme.AlphaPro" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>

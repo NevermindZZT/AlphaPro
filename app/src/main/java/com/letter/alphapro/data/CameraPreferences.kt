@@ -2,24 +2,26 @@ package com.letter.alphapro.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.annotation.StringRes
+import com.letter.alphapro.R
 import kotlinx.coroutines.flow.MutableStateFlow
 
-enum class AppThemeMode(val label: String) {
-    FOLLOW_SYSTEM("跟随系统"),
-    LIGHT("浅色模式"),
-    DARK("深色模式")
+enum class AppThemeMode(@StringRes val labelRes: Int) {
+    FOLLOW_SYSTEM(R.string.pref_theme_system),
+    LIGHT(R.string.pref_theme_light),
+    DARK(R.string.pref_theme_dark)
 }
 
-enum class GpsInterval(val seconds: Int, val label: String) {
-    FAST(3, "3秒 (激进)"),
-    BALANCED(5, "5秒 (推荐)"),
-    POWER_SAVING(10, "10秒 (节能)")
+enum class GpsInterval(val seconds: Int, @StringRes val labelRes: Int) {
+    FAST(3, R.string.pref_gps_fast),
+    BALANCED(5, R.string.pref_gps_balanced),
+    POWER_SAVING(10, R.string.pref_gps_saving)
 }
 
-enum class DefaultHeifPolicy(val label: String) {
-    TRANSCODE_JPEG("转码为 JPEG"),
-    ORIGINAL_HIF("原图 HIF 直出"),
-    ALWAYS_ASK("每次询问")
+enum class DefaultHeifPolicy(@StringRes val labelRes: Int) {
+    TRANSCODE_JPEG(R.string.pref_heif_jpeg),
+    ORIGINAL_HIF(R.string.pref_heif_original),
+    ALWAYS_ASK(R.string.pref_heif_ask)
 }
 
 object AppThemeState {

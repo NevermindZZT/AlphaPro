@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="network_link_error">Unable to read Wi-Fi network information: %1$s</string>
+    <string name="network_timeout">The Wi-Fi connection timed out or was declined.</string>
+    <string name="network_manual">Please connect to %1$s in the system Wi-Fi settings on this Android version.</string>
+    <string name="network_request_error">Unable to request the Wi-Fi connection: %1$s</string>
+</resources>

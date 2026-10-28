@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="control_mac_address">MAC: %1$s</string>
+    <string name="control_supported_cameras">Supports A7M4, A7R5, A6700, A7C2, ZV-E1 and more</string>
+    <string name="control_gps_active">Syncing every %1$d s</string>
+    <string name="control_gps_waiting">Waiting for camera</string>
+    <string name="control_gps_off">Sync off</string>
+    <string name="control_ftp_endpoint">%1$s:%2$d</string>
+    <string name="control_ftp_port_standby">Port %1$d ready</string>
+    <string name="control_photos_connect_wifi">Connect camera Wi-Fi to load photos</string>
+    <string name="control_app_name">AlphaPro</string>
+    <string name="control_hub_subtitle">Your Sony camera companion</string>
+    <string name="control_search_cameras">Find cameras to pair</string>
+    <string name="control_settings">Settings</string>
+    <string name="control_hub_controls">Controls &amp; status</string>
+    <string name="control_format_heif">10-bit HEIF</string>
+    <string name="control_format_raw_jpeg">RAW/JPEG</string>
+    <string name="control_ble_online">Bluetooth online · Active</string>
+    <string name="control_ble_pairing">Pairing…</string>
+    <string name="control_ble_connecting">Connecting…</string>
+    <string name="control_ble_handshaking">Authenticating…</string>
+    <string name="control_ble_discovering">Finding services…</string>
+    <string name="control_ble_sleeping">Camera asleep · Ready to reconnect</string>
+    <string name="control_ble_unpaired">No camera paired</string>
+    <string name="control_ble_error">Connection error</string>
+    <string name="control_disconnect">Disconnect</string>
+    <string name="control_reconnect">Reconnect</string>
+    <string name="control_cancel">Cancel</string>
+    <string name="control_forget_camera">Unpair camera</string>
+    <string name="control_no_sony_paired">No Sony camera paired</string>
+    <string name="control_pair_sony">Pair a Sony camera</string>
+    <string name="control_gps_sync">GPS sync</string>
+    <string name="control_ptp_online">PTP online</string>
+    <string name="control_wifi_direct">Wi-Fi direct</string>
+    <string name="control_wifi_connected">Wi-Fi connected</string>
+    <string name="control_camera_wifi">Camera Wi-Fi</string>
+    <string name="control_wifi_disconnect">Disconnect</string>
+    <string name="control_wifi_connect">Connect</string>
+    <string name="control_sync">Sync</string>
+    <string name="control_clock_sync">Clock sync</string>
+    <string name="control_clock_sync_hint">Tap to sync camera time</string>
+    <string name="control_connect_bluetooth_first">Connect Bluetooth first</string>
+    <string name="control_ftp_tether">FTP tether</string>
+    <string name="control_card_preview">Memory card photos</string>
+    <string name="control_mode_single">Single</string>
+    <string name="control_mode_continuous">Burst</string>
+    <string name="control_mode_bulb">Bulb</string>
+    <string name="control_mode_interval">Interval</string>
+    <string name="control_remote_ready_camera">%1$s · BLE remote ready</string>
+    <string name="control_bluetooth_disconnected">Bluetooth disconnected</string>
+    <string name="control_sony_camera">Sony camera</string>
+    <string name="control_remote_title">Bluetooth shutter</string>
+    <string name="control_ready">Ready</string>
+    <string name="control_offline">Offline</string>
+    <string name="control_remote_setup">On your camera, set [Network] → [Bluetooth] → [Bluetooth Rmt Ctrl] to [On].</string>
+    <string name="control_connect_camera_first">Connect camera first</string>
+    <string name="control_take_photo">Take photo</string>
+    <string name="control_af_locked">AF locked</string>
+    <string name="control_af_half_press">Half-press AF</string>
+    <string name="control_video_recording">Recording (REC)</string>
+    <string name="control_video_toggle">Video REC</string>
+    <string name="control_bulb_title">Bulb exposure</string>
+    <string name="control_exposure_duration">Exposure time</string>
+    <string name="control_bulb_stop">End exposure</string>
+    <string name="control_bulb_start">Start exposure</string>
+    <string name="control_interval_title">Interval shooting</string>
+    <string name="control_interval_running">Sequence running</string>
+    <string name="control_interval_start">Start sequence</string>
+    <string name="control_ftp_listening">Listening · Port %1$d</string>
+    <string name="control_ftp_stopped">Server stopped</string>
+    <string name="control_local_ftp">Local FTP: %1$s:%2$d</string>
+    <string name="control_ftp_enable_hint">Use the top-right switch to start</string>
+    <string name="control_file_size_mb">%1$.1f MB</string>
+    <string name="control_tether_empty_hint">Press the camera shutter. Originals arrive in %1$d–%2$d seconds for focus review.</string>
+    <string name="control_tether_title">Wireless FTP tether</string>
+    <string name="control_ftp_setup">On your camera: [Network] → [FTP Transfer] → [FTP Server 1]. Enter the IP above.</string>
+    <string name="control_toggle_lut">Toggle LUT preview</string>
+    <string name="control_tether_waiting">Waiting for camera photos…</string>
+    <string name="control_tether_start_hint">Start FTP tether above</string>
+    <string name="control_tether_history">Received photos</string>
+    <plurals name="control_photos_loaded">
+        <item quantity="one">%1$d photo loaded · %2$s</item>
+        <item quantity="other">%1$d photos loaded · %2$s</item>
+    </plurals>
+    <plurals name="control_seconds_elapsed">
+        <item quantity="one">%1$d second</item>
+        <item quantity="other">%1$d seconds</item>
+    </plurals>
+    <plurals name="control_interval_seconds">
+        <item quantity="one">Interval: %1$d second</item>
+        <item quantity="other">Interval: %1$d seconds</item>
+    </plurals>
+    <plurals name="control_planned_shots">
+        <item quantity="one">Plan: %1$d shot</item>
+        <item quantity="other">Plan: %1$d shots</item>
+    </plurals>
+    <plurals name="control_interval_remaining">
+        <item quantity="one">Interval running… %1$d shot left</item>
+        <item quantity="other">Interval running… %1$d shots left</item>
+    </plurals>
+    <plurals name="control_photos_received">
+        <item quantity="one">%1$d photo received</item>
+        <item quantity="other">%1$d photos received</item>
+    </plurals>
+</resources>

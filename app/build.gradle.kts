@@ -114,6 +114,7 @@ dependencies {
     implementation(project(":core:ftp"))
 
     implementation(libs.androidx.core.ktx)
+    implementation("androidx.appcompat:appcompat:1.7.0")
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.activity.compose)
@@ -130,5 +131,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.coil.compose)
 
+    testImplementation("junit:junit:4.13.2")
     debugImplementation(libs.androidx.ui.tooling)
 }

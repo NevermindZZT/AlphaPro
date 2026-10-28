@@ -15,10 +15,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.letter.alphapro.R
 import com.letter.alphapro.core.bluetooth.DiscoveredCamera
 import com.letter.alphapro.ui.theme.AlphaOrangePrimary
 
@@ -59,14 +61,14 @@ fun DeviceScanDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "搜索索尼微单",
+                    text = stringResource(R.string.dialog_scan_title),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                 )
                 if (isScanning) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 } else {
                     AlphaIconButton(onClick = { onRefreshScan(sonyOnlyFilter) }) {
-                        Icon(Icons.Rounded.Refresh, contentDescription = "重新搜索")
+                        Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.dialog_scan_refresh))
                     }
                 }
             }
@@ -79,7 +81,7 @@ fun DeviceScanDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "请确保索尼相机已开机，并在相机菜单中开启 [智能手机连接] 或 [蓝牙遥控] 保持配对就绪状态。",
+                    text = stringResource(R.string.dialog_scan_instructions),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -95,7 +97,7 @@ fun DeviceScanDialog(
                             sonyOnlyFilter = true
                             onRefreshScan(true)
                         },
-                        label = { Text("仅索尼相机", style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false) },
+                        label = { Text(stringResource(R.string.dialog_scan_sony_only), style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false) },
                         leadingIcon = if (sonyOnlyFilter) {
                             { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(AlphaButtonDefaults.IconSize)) }
                         } else null
@@ -106,7 +108,7 @@ fun DeviceScanDialog(
                             sonyOnlyFilter = false
                             onRefreshScan(false)
                         },
-                        label = { Text("全部蓝牙设备", style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false) },
+                        label = { Text(stringResource(R.string.dialog_scan_all_devices), style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false) },
                         leadingIcon = if (!sonyOnlyFilter) {
                             { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(AlphaButtonDefaults.IconSize)) }
                         } else null
@@ -133,12 +135,12 @@ fun DeviceScanDialog(
                                 modifier = Modifier.size(44.dp)
                             )
                             Text(
-                                text = if (isScanning) "正在搜索附近的索尼相机..." else "未发现索尼相机",
+                                text = if (isScanning) stringResource(R.string.dialog_scan_searching) else stringResource(R.string.dialog_scan_no_cameras),
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "若相机已配对过其他手机，请在机身菜单重置蓝牙配对",
+                                text = stringResource(R.string.dialog_scan_reset_hint),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -204,7 +206,7 @@ fun DeviceScanDialog(
                                                     color = AlphaOrangePrimary
                                                 ) {
                                                     Text(
-                                                        text = "Alpha",
+                                                        text = stringResource(R.string.dialog_scan_alpha_badge),
                                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
                                                         style = MaterialTheme.typography.labelSmall.copy(
                                                             fontSize = 9.sp,
@@ -240,7 +242,7 @@ fun DeviceScanDialog(
                                             AlphaButtonProgress()
                                         } else {
                                             Text(
-                                                text = "连接",
+                                                text = stringResource(R.string.dialog_scan_connect),
                                                 style = MaterialTheme.typography.labelLarge
                                             )
                                         }
@@ -254,7 +256,7 @@ fun DeviceScanDialog(
         },
         confirmButton = {
             AlphaTextButton(onClick = onDismissRequest) {
-                Text("关闭")
+                Text(stringResource(R.string.dialog_scan_close))
             }
         }
     )

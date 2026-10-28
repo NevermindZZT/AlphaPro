@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gallery_title">Camera gallery</string>
+    <string name="gallery_wifi_disconnected">Wi-Fi disconnected</string>
+    <string name="gallery_refresh">Refresh</string>
+    <string name="gallery_select_multiple">Select photos</string>
+    <string name="gallery_exit_selection">Exit selection</string>
+    <string name="gallery_export_originals">Originals</string>
+    <string name="gallery_smart_export">Smart export</string>
+    <string name="gallery_filter_all">All (%1$d)</string>
+    <string name="gallery_filter_heif">HEIF (%1$d)</string>
+    <string name="gallery_filter_raw">RAW (%1$d)</string>
+    <string name="gallery_camera_wifi_not_connected">Camera Wi-Fi is not connected</string>
+    <string name="gallery_connecting">Connecting…</string>
+    <string name="gallery_connect_wifi">Connect camera Wi-Fi</string>
+    <string name="gallery_empty_card">No photos on the memory card</string>
+    <string name="gallery_empty_filter">No photos match this filter</string>
+    <string name="gallery_show_all">Show all photos</string>
+    <string name="gallery_unknown_date">Unknown date</string>
+    <string name="gallery_expand_date">Expand date group</string>
+    <string name="gallery_collapse_date">Collapse date group</string>
+    <string name="gallery_photo_description">Photo: %1$s</string>
+    <string name="gallery_retry_thumbnail">Retry thumbnail</string>
+    <string name="gallery_select_photo">Select photo: %1$s</string>
+    <string name="gallery_deselect_photo">Deselect photo: %1$s</string>
+    <string name="gallery_viewer_title">Photo viewer</string>
+    <string name="gallery_reset_zoom">Reset zoom</string>
+    <string name="gallery_close">Close</string>
+    <string name="gallery_fetching_preview">Fetching preview…</string>
+    <string name="gallery_no_preview">No preview available</string>
+    <string name="gallery_camera_preview_dimensions">Camera preview · %1$d × %2$d px</string>
+    <string name="gallery_thumbnail_dimensions">Low-resolution thumbnail · %1$d × %2$d px</string>
+    <string name="gallery_preview_not_loaded">Preview not loaded</string>
+    <string name="gallery_loading">Loading…</string>
+    <string name="gallery_preview_unavailable">Camera preview unavailable</string>
+    <string name="gallery_retry_preview">Retry preview</string>
+    <string name="gallery_format_date">%1$s · %2$s</string>
+    <string name="gallery_dual_size">Combined size: %1$s</string>
+    <string name="gallery_size">Size: %1$s</string>
+    <string name="gallery_size_mb">%1$s MB</string>
+    <string name="gallery_download_export">Download / export</string>
+    <string name="gallery_export_photo">Export photo</string>
+    <string name="gallery_format_heif_10bit">10-bit HEIF</string>
+    <string name="gallery_format_jpeg">JPEG</string>
+    <string name="gallery_download_format_title">Download format (%1$s)</string>
+    <string name="gallery_download_format_description">This photo includes RAW and %1$s files. Choose what to export:</string>
+    <string name="gallery_download_visual_only">%1$s only</string>
+    <string name="gallery_download_visual_description">About %1$s · For sharing and quick viewing</string>
+    <string name="gallery_badge_share">Share</string>
+    <string name="gallery_download_raw_only">RAW only (.ARW)</string>
+    <string name="gallery_download_raw_description">About %1$s · For detailed editing on a computer or tablet</string>
+    <string name="gallery_badge_edit">Edit</string>
+    <string name="gallery_download_both">RAW + %1$s</string>
+    <string name="gallery_download_both_description">About %1$s total · Save both formats to your gallery</string>
+    <string name="gallery_badge_save_all">Keep all</string>
+    <string name="gallery_transcode_quality">Convert to JPEG (%1$s quality)</string>
+    <string name="gallery_transcode_description">Keep all EXIF data and support all galleries</string>
+    <string name="gallery_start_download">Download</string>
+    <string name="gallery_cancel">Cancel</string>
+    <string name="gallery_heif_export_title">HEIF export options</string>
+    <string name="gallery_heif_export_description">%1$s, including %2$s. Creators’ App cannot export HEIF on Android; AlphaPro supports multicore software decoding and original-file export.</string>
+    <string name="gallery_export_jpeg_title">High-quality JPEG (.jpg)</string>
+    <string name="gallery_export_jpeg_description">Decode with libde265, apply tone mapping, and preserve all EXIF data (aperture/shutter/GPS). Compatible with social apps and system galleries.</string>
+    <string name="gallery_compression_quality">Quality</string>
+    <string name="gallery_quality_value">%1$s (high fidelity)</string>
+    <string name="gallery_export_heif_title">Original HEIF (.hif)</string>
+    <string name="gallery_export_heif_description">Preserve the original 10-bit color depth and dynamic range. Save directly to the media library for detailed editing in Lightroom Mobile.</string>
+    <string name="gallery_export_hdr_title">Ultra HDR (Android 14+)</string>
+    <string name="gallery_export_hdr_description">Extract HLG data and create an HDR gain map for high-dynamic-range highlights on HDR phone screens.</string>
+    <string name="gallery_badge_experimental">New</string>
+    <string name="gallery_start_export">Export</string>
+    <plurals name="gallery_loaded_groups">
+        <item quantity="one">%1$d group loaded (%2$s)</item>
+        <item quantity="other">%1$d groups loaded (%2$s)</item>
+    </plurals>
+    <plurals name="gallery_file_count">
+        <item quantity="one">%1$d file</item>
+        <item quantity="other">%1$d files</item>
+    </plurals>
+    <plurals name="gallery_selected_groups">
+        <item quantity="one">%1$d group selected</item>
+        <item quantity="other">%1$d groups selected</item>
+    </plurals>
+    <plurals name="gallery_photo_count">
+        <item quantity="one">%1$d photo</item>
+        <item quantity="other">%1$d photos</item>
+    </plurals>
+    <plurals name="gallery_selected_items">
+        <item quantity="one">%1$d item selected</item>
+        <item quantity="other">%1$d items selected</item>
+    </plurals>
+    <plurals name="gallery_heif_photos">
+        <item quantity="one">%1$d 10-bit 4:2:2 HEIF photo</item>
+        <item quantity="other">%1$d 10-bit 4:2:2 HEIF photos</item>
+    </plurals>
+</resources>

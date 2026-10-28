@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="control_mac_address">MAC：%1$s</string>
+    <string name="control_supported_cameras">支持 A7M4、A7R5、A6700、A7C2、ZV-E1 等机型</string>
+    <string name="control_gps_active">正在同步（每 %1$d 秒）</string>
+    <string name="control_gps_waiting">等待相机开机</string>
+    <string name="control_gps_off">同步已关闭</string>
+    <string name="control_ftp_endpoint">%1$s:%2$d</string>
+    <string name="control_ftp_port_standby">端口 %1$d 待命</string>
+    <string name="control_photos_connect_wifi">请连接相机 Wi-Fi 载入照片</string>
+    <string name="control_app_name">AlphaPro</string>
+    <string name="control_hub_subtitle">索尼相机专业伴侣</string>
+    <string name="control_search_cameras">搜索配对相机</string>
+    <string name="control_settings">设置</string>
+    <string name="control_hub_controls">控制中心与状态</string>
+    <string name="control_format_heif">10-bit HEIF</string>
+    <string name="control_format_raw_jpeg">RAW/JPEG</string>
+    <string name="control_ble_online">蓝牙已连接 · 正在同步</string>
+    <string name="control_ble_pairing">正在配对…</string>
+    <string name="control_ble_connecting">正在连接…</string>
+    <string name="control_ble_handshaking">正在验证连接…</string>
+    <string name="control_ble_discovering">正在发现服务…</string>
+    <string name="control_ble_sleeping">相机休眠 · 待命重连</string>
+    <string name="control_ble_unpaired">未配对相机</string>
+    <string name="control_ble_error">连接异常</string>
+    <string name="control_disconnect">断开连接</string>
+    <string name="control_reconnect">重新连接</string>
+    <string name="control_cancel">取消</string>
+    <string name="control_forget_camera">解除配对</string>
+    <string name="control_no_sony_paired">尚未配对索尼相机</string>
+    <string name="control_pair_sony">搜索并配对索尼相机</string>
+    <string name="control_gps_sync">后台 GPS 同步</string>
+    <string name="control_ptp_online">PTP 在线</string>
+    <string name="control_wifi_direct">Wi-Fi 直连</string>
+    <string name="control_wifi_connected">相机 Wi-Fi 已连接</string>
+    <string name="control_camera_wifi">相机 Wi-Fi 直连</string>
+    <string name="control_wifi_disconnect">断开 Wi-Fi</string>
+    <string name="control_wifi_connect">一键连接</string>
+    <string name="control_sync">同步</string>
+    <string name="control_clock_sync">时钟校准</string>
+    <string name="control_clock_sync_hint">点击同步机身时钟</string>
+    <string name="control_connect_bluetooth_first">请先连接相机蓝牙</string>
+    <string name="control_ftp_tether">FTP 边拍边传</string>
+    <string name="control_card_preview">存储卡照片预览</string>
+    <string name="control_mode_single">单张</string>
+    <string name="control_mode_continuous">连拍</string>
+    <string name="control_mode_bulb">B 门</string>
+    <string name="control_mode_interval">延时</string>
+    <string name="control_remote_ready_camera">%1$s · BLE 遥控就绪</string>
+    <string name="control_bluetooth_disconnected">蓝牙未连接</string>
+    <string name="control_sony_camera">索尼微单</string>
+    <string name="control_remote_title">无线蓝牙快门</string>
+    <string name="control_ready">已就绪</string>
+    <string name="control_offline">未联机</string>
+    <string name="control_remote_setup">请在相机菜单中将 [网络] → [Bluetooth] → [Bluetooth遥控] 设为 [开]。</string>
+    <string name="control_connect_camera_first">请先连接相机</string>
+    <string name="control_take_photo">按下拍照</string>
+    <string name="control_af_locked">AF 已锁定</string>
+    <string name="control_af_half_press">半按 AF</string>
+    <string name="control_video_recording">录像中 (REC)</string>
+    <string name="control_video_toggle">录像开关</string>
+    <string name="control_bulb_title">B 门长曝光控制</string>
+    <string name="control_exposure_duration">曝光持续时间</string>
+    <string name="control_bulb_stop">结束长曝光</string>
+    <string name="control_bulb_start">锁定并开始长曝光</string>
+    <string name="control_interval_title">延时拍摄</string>
+    <string name="control_interval_running">延时序列进行中</string>
+    <string name="control_interval_start">启动延时拍摄序列</string>
+    <string name="control_ftp_listening">服务监听中 · 端口 %1$d</string>
+    <string name="control_ftp_stopped">服务未启动</string>
+    <string name="control_local_ftp">本机 FTP：%1$s:%2$d</string>
+    <string name="control_ftp_enable_hint">请开启右上角开关启动服务</string>
+    <string name="control_file_size_mb">%1$.1f MB</string>
+    <string name="control_tether_empty_hint">在相机上按下快门，原图将在 %1$d～%2$d 秒内自动传至手机，方便检焦。</string>
+    <string name="control_tether_title">无线边拍边传 (FTP)</string>
+    <string name="control_ftp_setup">相机设置：[网络] → [FTP传输] → [FTP服务器1]，填入上述 IP。</string>
+    <string name="control_toggle_lut">切换 LUT 预览</string>
+    <string name="control_tether_waiting">等待相机传输照片…</string>
+    <string name="control_tether_start_hint">请先开启上方 FTP 边拍边传服务</string>
+    <string name="control_tether_history">照片回传记录</string>
+    <plurals name="control_photos_loaded">
+        <item quantity="one">已载入 %1$d 张照片 · %2$s</item>
+        <item quantity="other">已载入 %1$d 张照片 · %2$s</item>
+    </plurals>
+    <plurals name="control_seconds_elapsed">
+        <item quantity="one">%1$d 秒</item>
+        <item quantity="other">%1$d 秒</item>
+    </plurals>
+    <plurals name="control_interval_seconds">
+        <item quantity="one">拍摄间隔：%1$d 秒</item>
+        <item quantity="other">拍摄间隔：%1$d 秒</item>
+    </plurals>
+    <plurals name="control_planned_shots">
+        <item quantity="one">计划张数：%1$d 张</item>
+        <item quantity="other">计划张数：%1$d 张</item>
+    </plurals>
+    <plurals name="control_interval_remaining">
+        <item quantity="one">正在延时拍摄… 剩余 %1$d 张</item>
+        <item quantity="other">正在延时拍摄… 剩余 %1$d 张</item>
+    </plurals>
+    <plurals name="control_photos_received">
+        <item quantity="one">已接收 %1$d 张</item>
+        <item quantity="other">已接收 %1$d 张</item>
+    </plurals>
+</resources>

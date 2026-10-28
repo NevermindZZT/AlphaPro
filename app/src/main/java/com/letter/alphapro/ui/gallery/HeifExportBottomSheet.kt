@@ -15,6 +15,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.letter.alphapro.R
+import java.text.NumberFormat
 
 enum class HeifExportMode {
     ORIGINAL_HIF,
@@ -32,6 +37,8 @@ fun HeifExportBottomSheet(
 ) {
     var selectedMode by remember { mutableStateOf(HeifExportMode.TRANSCODE_JPEG) }
     var jpegQuality by remember { mutableStateOf(95f) }
+    val locale = LocalConfiguration.current.locales[0]
+    val percentFormat = remember(locale) { NumberFormat.getPercentInstance(locale) }
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -46,11 +53,13 @@ fun HeifExportBottomSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "HEIF 导出策略选择",
+                text = stringResource(R.string.gallery_heif_export_title),
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
             )
             Text(
-                text = "已选 " + selectedCount.toString() + " 项，其中包含 " + heifCount.toString() + " 张 10-bit 4:2:2 HEIF 照片。由于官方 Creators' App 无法在 Android 导出 HEIF，AlphaPro 提供多核软解与原图双轨支持。",
+                text = stringResource(R.string.gallery_heif_export_description,
+                    pluralStringResource(R.plurals.gallery_selected_items, selectedCount, selectedCount),
+                    pluralStringResource(R.plurals.gallery_heif_photos, heifCount, heifCount)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -58,9 +67,9 @@ fun HeifExportBottomSheet(
             // Option 1: Transcode to high quality JPEG
             ExportOptionCard(
                 icon = Icons.Rounded.Transform,
-                title = "转码为高质量 JPEG (.jpg)",
-                subtitle = "使用 libde265 软解，色调映射转换，完整迁移 EXIF (光圈/快门/GPS)，兼容所有社交与系统相册",
-                badge = "推荐分享",
+                title = stringResource(R.string.gallery_export_jpeg_title),
+                subtitle = stringResource(R.string.gallery_export_jpeg_description),
+                badge = stringResource(R.string.gallery_badge_share),
                 selected = selectedMode == HeifExportMode.TRANSCODE_JPEG,
                 onClick = { selectedMode = HeifExportMode.TRANSCODE_JPEG }
             ) {
@@ -70,8 +79,8 @@ fun HeifExportBottomSheet(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("压缩品质", style = MaterialTheme.typography.labelMedium)
-                            Text(jpegQuality.toInt().toString() + "% (极佳保真度)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                            Text(stringResource(R.string.gallery_compression_quality), style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.gallery_quality_value, percentFormat.format(jpegQuality.toInt() / 100.0)), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                         }
                         Slider(
                             value = jpegQuality,
@@ -86,9 +95,9 @@ fun HeifExportBottomSheet(
             // Option 2: Original HIF file
             ExportOptionCard(
                 icon = Icons.Rounded.RawOn,
-                title = "原始 HEIF 文件直出 (.hif)",
-                subtitle = "保持未压缩的 10-bit 色深与动态范围，直接写入媒体库，适合在 Lightroom Mobile 中精细修图",
-                badge = "专业后期",
+                title = stringResource(R.string.gallery_export_heif_title),
+                subtitle = stringResource(R.string.gallery_export_heif_description),
+                badge = stringResource(R.string.gallery_badge_edit),
                 selected = selectedMode == HeifExportMode.ORIGINAL_HIF,
                 onClick = { selectedMode = HeifExportMode.ORIGINAL_HIF }
             )
@@ -96,9 +105,9 @@ fun HeifExportBottomSheet(
             // Option 3: Ultra HDR (Android 14+)
             ExportOptionCard(
                 icon = Icons.Rounded.HdrOn,
-                title = "Android 14+ Ultra HDR 格式",
-                subtitle = "提取 HLG 高动态范围信息并合成 HDR Gainmap 增益图，在 HDR 手机屏幕上呈现超高动态高光",
-                badge = "前沿体验",
+                title = stringResource(R.string.gallery_export_hdr_title),
+                subtitle = stringResource(R.string.gallery_export_hdr_description),
+                badge = stringResource(R.string.gallery_badge_experimental),
                 selected = selectedMode == HeifExportMode.ULTRA_HDR,
                 onClick = { selectedMode = HeifExportMode.ULTRA_HDR }
             )
@@ -110,11 +119,11 @@ fun HeifExportBottomSheet(
                 AlphaOutlinedButton(
                     onClick = onDismissRequest,
                     modifier = Modifier.weight(1f)
-                ) { Text("取消") }
+                ) { Text(stringResource(R.string.gallery_cancel)) }
                 AlphaButton(
                     onClick = { onStartExport(selectedMode, jpegQuality.toInt()) },
                     modifier = Modifier.weight(1f)
-                ) { Text("开始高速导出") }
+                ) { Text(stringResource(R.string.gallery_start_export)) }
             }
         }
     }

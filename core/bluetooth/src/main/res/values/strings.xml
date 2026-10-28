@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ble_invalid_address">Invalid Bluetooth address: %1$s</string>
+    <string name="ble_pairing_failed">Bluetooth pairing failed or was cancelled.</string>
+    <string name="ble_camera_name">Sony camera</string>
+    <string name="ble_camera_fallback">Sony camera (%1$s)</string>
+    <string name="ble_device_fallback">Bluetooth device (%1$s)</string>
+</resources>

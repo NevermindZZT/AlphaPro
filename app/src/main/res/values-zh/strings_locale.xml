@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="language_title">应用语言</string>
+    <string name="language_description">选择应用语言，或跟随设备的系统语言。</string>
+    <string name="language_system">跟随系统</string>
+    <string name="pref_theme_system">跟随系统</string>
+    <string name="pref_theme_light">浅色模式</string>
+    <string name="pref_theme_dark">深色模式</string>
+    <string name="pref_gps_fast">3秒（激进）</string>
+    <string name="pref_gps_balanced">5秒（推荐）</string>
+    <string name="pref_gps_saving">10秒（节能）</string>
+    <string name="pref_heif_jpeg">转为 JPEG</string>
+    <string name="pref_heif_original">原图 HIF</string>
+    <string name="pref_heif_ask">每次询问</string>
+    <string name="nav_dashboard">仪表盘</string>
+    <string name="nav_gallery">相机相册</string>
+    <string name="nav_tether">边拍边传</string>
+    <string name="nav_remote">无线快门</string>
+</resources>

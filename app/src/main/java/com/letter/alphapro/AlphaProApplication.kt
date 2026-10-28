@@ -21,7 +21,7 @@ class AlphaProApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        gattManager = SonyBleGattManager(this)
+        gattManager = SonyBleGattManager(this, messageContext = { com.letter.alphapro.data.AppLanguage.localizedContext(this) })
         val locationSource = FusedLocationSource(this)
         locationEngine = AdaptiveLocationEngine(locationSource)
         val publicDocs = File(

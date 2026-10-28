@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ble_invalid_address">无效蓝牙地址：%1$s</string>
+    <string name="ble_pairing_failed">蓝牙配对失败或已被取消。</string>
+    <string name="ble_camera_name">索尼相机</string>
+    <string name="ble_camera_fallback">索尼相机（%1$s）</string>
+    <string name="ble_device_fallback">蓝牙设备（%1$s）</string>
+</resources>

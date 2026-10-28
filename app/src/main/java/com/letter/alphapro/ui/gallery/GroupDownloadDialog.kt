@@ -14,6 +14,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
+import com.letter.alphapro.R
+import java.text.NumberFormat
 import com.letter.alphapro.core.ptp.CameraCaptureGroup
 
 enum class GroupDownloadTarget {
@@ -32,10 +36,12 @@ fun GroupDownloadDialog(
     var selectedTarget by remember { mutableStateOf(GroupDownloadTarget.VISUAL_ONLY) }
     var transcodeHeif by remember { mutableStateOf(true) }
 
-    val visualName = if (group.hasHeif) "10-bit HEIF" else "JPEG"
-    val visualSizeMb = String.format("%.1f MB", group.visualFile.fileSize / (1024.0 * 1024.0))
-    val rawSizeMb = String.format("%.1f MB", (group.rawFile?.fileSize ?: 0) / (1024.0 * 1024.0))
-    val totalSizeMb = String.format("%.1f MB", group.totalSizeMb)
+    val visualName = stringResource(if (group.hasHeif) R.string.gallery_format_heif_10bit else R.string.gallery_format_jpeg)
+    val visualSizeMb = gallerySizeLabel(group.visualFile.fileSize / (1024.0 * 1024.0))
+    val rawSizeMb = gallerySizeLabel((group.rawFile?.fileSize ?: 0) / (1024.0 * 1024.0))
+    val totalSizeMb = gallerySizeLabel(group.totalSizeMb)
+    val locale = LocalConfiguration.current.locales[0]
+    val quality = remember(locale) { NumberFormat.getPercentInstance(locale).format(0.95) }
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -49,7 +55,7 @@ fun GroupDownloadDialog(
         },
         title = {
             Text(
-                text = "下载格式选择 (${group.baseName})",
+                text = stringResource(R.string.gallery_download_format_title, group.baseName),
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
             )
         },
@@ -59,7 +65,7 @@ fun GroupDownloadDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "检测到该照片包含 RAW 与 $visualName 双格式，请选择导出内容：",
+                    text = stringResource(R.string.gallery_download_format_description, visualName),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -68,9 +74,9 @@ fun GroupDownloadDialog(
 
                 // Option 1: Visual only (JPG / HIF)
                 DownloadTargetCard(
-                    title = "仅下载 $visualName",
-                    subtitle = "体积约 $visualSizeMb · 适合社交发图与快速浏览",
-                    badge = "推荐分享",
+                    title = stringResource(R.string.gallery_download_visual_only, visualName),
+                    subtitle = stringResource(R.string.gallery_download_visual_description, visualSizeMb),
+                    badge = stringResource(R.string.gallery_badge_share),
                     icon = Icons.Rounded.Image,
                     selected = selectedTarget == GroupDownloadTarget.VISUAL_ONLY,
                     onClick = { selectedTarget = GroupDownloadTarget.VISUAL_ONLY }
@@ -78,9 +84,9 @@ fun GroupDownloadDialog(
 
                 // Option 2: RAW only
                 DownloadTargetCard(
-                    title = "仅下载 RAW 原片 (.ARW)",
-                    subtitle = "体积约 $rawSizeMb · 适合在电脑/平板进行精细后期调色",
-                    badge = "专业后期",
+                    title = stringResource(R.string.gallery_download_raw_only),
+                    subtitle = stringResource(R.string.gallery_download_raw_description, rawSizeMb),
+                    badge = stringResource(R.string.gallery_badge_edit),
                     icon = Icons.Rounded.RawOn,
                     selected = selectedTarget == GroupDownloadTarget.RAW_ONLY,
                     onClick = { selectedTarget = GroupDownloadTarget.RAW_ONLY }
@@ -88,9 +94,9 @@ fun GroupDownloadDialog(
 
                 // Option 3: Both RAW + Visual
                 DownloadTargetCard(
-                    title = "同时下载 RAW + $visualName",
-                    subtitle = "总大小约 $totalSizeMb · 完整双格式归档到手机相册",
-                    badge = "全部保存",
+                    title = stringResource(R.string.gallery_download_both, visualName),
+                    subtitle = stringResource(R.string.gallery_download_both_description, totalSizeMb),
+                    badge = stringResource(R.string.gallery_badge_save_all),
                     icon = Icons.Rounded.FolderZip,
                     selected = selectedTarget == GroupDownloadTarget.BOTH,
                     onClick = { selectedTarget = GroupDownloadTarget.BOTH }
@@ -113,11 +119,11 @@ fun GroupDownloadDialog(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "转码为通用 JPEG (95%品质)",
+                                    text = stringResource(R.string.gallery_transcode_quality, quality),
                                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                                 )
                                 Text(
-                                    text = "保留全部 EXIF 拍摄参数并兼容所有相册",
+                                    text = stringResource(R.string.gallery_transcode_description),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -135,15 +141,28 @@ fun GroupDownloadDialog(
             AlphaButton(
                 onClick = { onConfirmDownload(selectedTarget, transcodeHeif) }
             ) {
-                Text("开始下载")
+                Text(stringResource(R.string.gallery_start_download))
             }
         },
         dismissButton = {
             AlphaTextButton(onClick = onDismissRequest) {
-                Text("取消")
+                Text(stringResource(R.string.gallery_cancel))
             }
         }
     )
+}
+
+/** Format display values with the app configuration, not the device default locale. */
+@Composable
+internal fun gallerySizeLabel(sizeMb: Double): String {
+    val locale = LocalConfiguration.current.locales[0]
+    val numberFormat = remember(locale) {
+        NumberFormat.getNumberInstance(locale).apply {
+            minimumFractionDigits = 1
+            maximumFractionDigits = 1
+        }
+    }
+    return stringResource(R.string.gallery_size_mb, numberFormat.format(sizeMb))
 }
 
 @Composable

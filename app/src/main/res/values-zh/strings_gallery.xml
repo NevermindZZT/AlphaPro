@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gallery_title">相机存储卡浏览</string>
+    <string name="gallery_wifi_disconnected">Wi-Fi 未连接</string>
+    <string name="gallery_refresh">刷新</string>
+    <string name="gallery_select_multiple">多选照片</string>
+    <string name="gallery_exit_selection">退出多选</string>
+    <string name="gallery_export_originals">原图直出</string>
+    <string name="gallery_smart_export">智能导出</string>
+    <string name="gallery_filter_all">全部（%1$d）</string>
+    <string name="gallery_filter_heif">HEIF（%1$d）</string>
+    <string name="gallery_filter_raw">RAW（%1$d）</string>
+    <string name="gallery_camera_wifi_not_connected">尚未连接相机 Wi-Fi</string>
+    <string name="gallery_connecting">正在连接…</string>
+    <string name="gallery_connect_wifi">直连相机 Wi-Fi</string>
+    <string name="gallery_empty_card">存储卡内暂无照片</string>
+    <string name="gallery_empty_filter">没有符合当前筛选的照片</string>
+    <string name="gallery_show_all">显示全部照片</string>
+    <string name="gallery_unknown_date">日期未知</string>
+    <string name="gallery_expand_date">展开日期分组</string>
+    <string name="gallery_collapse_date">折叠日期分组</string>
+    <string name="gallery_photo_description">照片：%1$s</string>
+    <string name="gallery_retry_thumbnail">重试缩略图</string>
+    <string name="gallery_select_photo">选择照片：%1$s</string>
+    <string name="gallery_deselect_photo">取消选择照片：%1$s</string>
+    <string name="gallery_viewer_title">照片查看器</string>
+    <string name="gallery_reset_zoom">还原缩放</string>
+    <string name="gallery_close">关闭</string>
+    <string name="gallery_fetching_preview">正在获取预览…</string>
+    <string name="gallery_no_preview">暂无可用预览</string>
+    <string name="gallery_camera_preview_dimensions">相机预览 · %1$d × %2$d 像素</string>
+    <string name="gallery_thumbnail_dimensions">低分辨率缩略图 · %1$d × %2$d 像素</string>
+    <string name="gallery_preview_not_loaded">尚未加载预览</string>
+    <string name="gallery_loading">正在载入…</string>
+    <string name="gallery_preview_unavailable">相机预览不可用</string>
+    <string name="gallery_retry_preview">重试预览</string>
+    <string name="gallery_format_date">%1$s · %2$s</string>
+    <string name="gallery_dual_size">双格式总大小：%1$s</string>
+    <string name="gallery_size">大小：%1$s</string>
+    <string name="gallery_size_mb">%1$s MB</string>
+    <string name="gallery_download_export">下载 / 导出</string>
+    <string name="gallery_export_photo">导出照片</string>
+    <string name="gallery_format_heif_10bit">10 位 HEIF</string>
+    <string name="gallery_format_jpeg">JPEG</string>
+    <string name="gallery_download_format_title">下载格式选择（%1$s）</string>
+    <string name="gallery_download_format_description">检测到该照片包含 RAW 与 %1$s 双格式，请选择导出内容：</string>
+    <string name="gallery_download_visual_only">仅下载 %1$s</string>
+    <string name="gallery_download_visual_description">体积约 %1$s · 适合社交发图与快速浏览</string>
+    <string name="gallery_badge_share">推荐分享</string>
+    <string name="gallery_download_raw_only">仅下载 RAW 原片 (.ARW)</string>
+    <string name="gallery_download_raw_description">体积约 %1$s · 适合在电脑或平板进行精细后期调色</string>
+    <string name="gallery_badge_edit">专业后期</string>
+    <string name="gallery_download_both">同时下载 RAW + %1$s</string>
+    <string name="gallery_download_both_description">总大小约 %1$s · 完整双格式归档到手机相册</string>
+    <string name="gallery_badge_save_all">全部保存</string>
+    <string name="gallery_transcode_quality">转码为通用 JPEG（%1$s 品质）</string>
+    <string name="gallery_transcode_description">保留全部 EXIF 拍摄参数并兼容所有相册</string>
+    <string name="gallery_start_download">开始下载</string>
+    <string name="gallery_cancel">取消</string>
+    <string name="gallery_heif_export_title">HEIF 导出策略选择</string>
+    <string name="gallery_heif_export_description">%1$s，其中包含 %2$s。由于官方 Creators’ App 无法在 Android 导出 HEIF，AlphaPro 提供多核软解与原图双轨支持。</string>
+    <string name="gallery_export_jpeg_title">转码为高质量 JPEG (.jpg)</string>
+    <string name="gallery_export_jpeg_description">使用 libde265 软解、色调映射转换，完整迁移 EXIF（光圈/快门/GPS），兼容所有社交与系统相册</string>
+    <string name="gallery_compression_quality">压缩品质</string>
+    <string name="gallery_quality_value">%1$s（极佳保真度）</string>
+    <string name="gallery_export_heif_title">原始 HEIF 文件直出 (.hif)</string>
+    <string name="gallery_export_heif_description">保留原始 10 位色深与动态范围，直接写入媒体库，适合在 Lightroom Mobile 中精细修图</string>
+    <string name="gallery_export_hdr_title">Android 14+ Ultra HDR 格式</string>
+    <string name="gallery_export_hdr_description">提取 HLG 高动态范围信息并合成 HDR Gainmap 增益图，在 HDR 手机屏幕上呈现超高动态高光</string>
+    <string name="gallery_badge_experimental">前沿体验</string>
+    <string name="gallery_start_export">开始导出</string>
+    <plurals name="gallery_loaded_groups">
+        <item quantity="other">已载入 %1$d 组照片（%2$s）</item>
+    </plurals>
+    <plurals name="gallery_file_count">
+        <item quantity="other">%1$d 个文件</item>
+    </plurals>
+    <plurals name="gallery_selected_groups">
+        <item quantity="other">已选择 %1$d 组照片</item>
+    </plurals>
+    <plurals name="gallery_photo_count">
+        <item quantity="other">%1$d 张</item>
+    </plurals>
+    <plurals name="gallery_selected_items">
+        <item quantity="other">已选 %1$d 项</item>
+    </plurals>
+    <plurals name="gallery_heif_photos">
+        <item quantity="other">%1$d 张 10 位 4:2:2 HEIF 照片</item>
+    </plurals>
+</resources>

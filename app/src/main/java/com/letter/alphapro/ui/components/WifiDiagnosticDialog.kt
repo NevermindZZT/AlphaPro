@@ -12,19 +12,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.letter.alphapro.R
 
 @Composable
 fun WifiDiagnosticDialog(diagnostic: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Wi-Fi 连接诊断") },
+        title = { Text(stringResource(R.string.dialog_wifi_title)) },
         text = {
             SelectionContainer {
                 Text(
-                    "以下仅包含阶段、特征编号、状态码、响应长度和 MTU，不包含热点名称或密码。\n\n" + diagnostic,
+                    stringResource(R.string.dialog_wifi_report, diagnostic),
                     modifier = Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState()),
                     fontFamily = FontFamily.Monospace
                 )
@@ -33,9 +35,9 @@ fun WifiDiagnosticDialog(diagnostic: String, onDismiss: () -> Unit) {
         confirmButton = {
             AlphaTextButton(onClick = {
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("AlphaPro Wi-Fi 诊断", diagnostic))
-            }) { Text("复制诊断") }
+                clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.dialog_wifi_clip_label), diagnostic))
+            }) { Text(stringResource(R.string.dialog_wifi_copy)) }
         },
-        dismissButton = { AlphaTextButton(onClick = onDismiss) { Text("关闭") } }
+        dismissButton = { AlphaTextButton(onClick = onDismiss) { Text(stringResource(R.string.dialog_wifi_close)) } }
     )
 }

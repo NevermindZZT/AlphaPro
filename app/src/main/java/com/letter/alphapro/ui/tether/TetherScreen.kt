@@ -13,6 +13,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.letter.alphapro.R
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -45,11 +48,11 @@ fun TetherScreen(
                 title = {
                     Column {
                         Text(
-                            text = "无线边拍边传 (FTP Tether)",
+                            text = stringResource(R.string.control_tether_title),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                         )
                         Text(
-                            text = if (uiState.isFtpServerRunning) "服务监听中 · 端口 2121" else "服务未启动",
+                            text = if (uiState.isFtpServerRunning) stringResource(R.string.control_ftp_listening, 2121) else stringResource(R.string.control_ftp_stopped),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -98,11 +101,11 @@ fun TetherScreen(
                         Column {
                             val ip = uiState.localFtpIp ?: "127.0.0.1"
                             Text(
-                                text = if (uiState.isFtpServerRunning) "本机 FTP: " + ip + ":2121" else "请开启右上角开关启动服务",
+                                text = if (uiState.isFtpServerRunning) stringResource(R.string.control_local_ftp, ip, 2121) else stringResource(R.string.control_ftp_enable_hint),
                                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                             )
                             Text(
-                                text = "相机设置: [网络] -> [FTP传输] -> [FTP服务器1] 填入上述IP",
+                                text = stringResource(R.string.control_ftp_setup),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -140,7 +143,7 @@ fun TetherScreen(
                                 AlphaIconButton(onClick = { isLutActive = !isLutActive }) {
                                     Icon(
                                         imageVector = Icons.Rounded.ColorLens,
-                                        contentDescription = "LUT",
+                                        contentDescription = stringResource(R.string.control_toggle_lut),
                                         tint = if (isLutActive) MaterialTheme.colorScheme.primary else Color.White
                                     )
                                 }
@@ -169,7 +172,7 @@ fun TetherScreen(
                                     ),
                                     color = Color.White
                                 )
-                                val sizeMb = String.format("%.1f MB", activeDisplayPhoto.fileSize / (1024.0 * 1024.0))
+                                val sizeMb = stringResource(R.string.control_file_size_mb, activeDisplayPhoto.fileSize / (1024.0 * 1024.0))
                                 Text(
                                     text = sizeMb,
                                     style = MaterialTheme.typography.bodySmall,
@@ -191,12 +194,12 @@ fun TetherScreen(
                                     modifier = Modifier.size(64.dp)
                                 )
                                 Text(
-                                    text = if (uiState.isFtpServerRunning) "等待相机拍摄传输照片..." else "请先开启上方 FTP 边拍边传服务",
+                                    text = if (uiState.isFtpServerRunning) stringResource(R.string.control_tether_waiting) else stringResource(R.string.control_tether_start_hint),
                                     style = MaterialTheme.typography.titleMedium,
                                     color = Color.White.copy(alpha = 0.8f)
                                 )
                                 Text(
-                                    text = "在相机上按下快门，原图即刻在 1~2 秒内自动推送至手机检焦",
+                                    text = stringResource(R.string.control_tether_empty_hint, 1, 2),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color.Gray
                                 )
@@ -214,12 +217,12 @@ fun TetherScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "底片回传流",
+                            text = stringResource(R.string.control_tether_history),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "已接收 " + uiState.tetherPhotos.size.toString() + " 张",
+                            text = pluralStringResource(R.plurals.control_photos_received, uiState.tetherPhotos.size, uiState.tetherPhotos.size),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

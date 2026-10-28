@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="network_link_error">读取 Wi-Fi 网络信息异常：%1$s</string>
+    <string name="network_timeout">Wi-Fi 连接超时或被拒绝。</string>
+    <string name="network_manual">当前系统版本请在系统 Wi-Fi 设置中手动连接：%1$s</string>
+    <string name="network_request_error">发起 Wi-Fi 连接异常：%1$s</string>
+</resources>

@@ -1,6 +1,9 @@
 package com.letter.alphapro.wifi
 
 import android.content.Context
+import androidx.annotation.StringRes
+import com.letter.alphapro.R
+import com.letter.alphapro.data.AppLanguage
 import android.net.*
 import android.net.wifi.WifiNetworkSpecifier
 import android.os.Build
@@ -17,6 +20,8 @@ sealed interface CameraWifiState {
 }
 
 class CameraWifiSpecifierConnector(private val context: Context) {
+    private fun text(@StringRes id: Int, vararg args: Any) = AppLanguage.getString(context, id, *args)
+
     private val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
@@ -93,7 +98,7 @@ class CameraWifiSpecifierConnector(private val context: Context) {
                                     }
                                 }
                             } catch (e: Exception) {
-                                finish(CameraWifiState.Error("读取 Wi-Fi 网络信息异常: " + (e.message ?: "")))
+                                finish(CameraWifiState.Error(text(R.string.network_link_error, e.message.orEmpty())))
                             }
                         }
                     }
@@ -101,7 +106,7 @@ class CameraWifiSpecifierConnector(private val context: Context) {
                     override fun onUnavailable() {
                         synchronized(requestLock) {
                             if (activeRequest !== owner) return
-                            finish(CameraWifiState.Error("Wi-Fi 连接超时或被拒绝"))
+                            finish(CameraWifiState.Error(text(R.string.network_timeout)))
                         }
                     }
 
@@ -123,14 +128,14 @@ class CameraWifiSpecifierConnector(private val context: Context) {
             } else {
                 synchronized(requestLock) {
                     if (activeRequest === owner) {
-                        finish(CameraWifiState.Error("系统版本较低，请在系统 Wi-Fi 设置中手动连接 SSID: $ssid"))
+                        finish(CameraWifiState.Error(text(R.string.network_manual, ssid)))
                     }
                 }
             }
         } catch (e: Exception) {
             synchronized(requestLock) {
                 if (activeRequest === owner) {
-                    finish(CameraWifiState.Error("发起 Wi-Fi 连接异常: " + (e.message ?: "")))
+                    finish(CameraWifiState.Error(text(R.string.network_request_error, e.message.orEmpty())))
                 }
             }
         }

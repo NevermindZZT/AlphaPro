@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="runtime_camera_name_fallback">Sony Camera</string>
+    <string name="runtime_time_sync_success">Camera clock calibrated (precisely synchronized with your phone)</string>
+    <string name="runtime_time_sync_failed">Clock calibration failed. Check that Bluetooth is connected.</string>
+    <string name="runtime_wifi_wait_for_bluetooth">Wait for the camera Bluetooth handshake to finish before connecting to Wi-Fi.</string>
+    <string name="runtime_wifi_enable_phone">Turn on Wi-Fi on your phone first.</string>
+    <string name="runtime_wifi_reading_credentials">Reading hotspot details over Bluetooth…</string>
+    <string name="runtime_wifi_diagnostic">Wi-Fi diagnostics W2 · %1$s\n%2$s\n%3$s</string>
+    <string name="runtime_wifi_credentials_failed">Could not read camera hotspot details. See diagnostics for more information.</string>
+    <string name="runtime_wifi_awaiting_confirmation">Hotspot details read. Waiting for system Wi-Fi connection confirmation…</string>
+    <string name="runtime_wifi_connected_loading">Wi-Fi connected. Loading photos…</string>
+    <string name="runtime_wifi_connection_failed">Hotspot details read; Wi-Fi connection failed: %1$s</string>
+    <string name="runtime_wifi_process_failed">Wi-Fi setup failed: %1$s</string>
+    <string name="runtime_wifi_disconnected">Wi-Fi disconnected</string>
+    <string name="runtime_no_photos">No photos on the memory card</string>
+    <string name="runtime_media_load_failed">Could not read the camera memory card: %1$s</string>
+    <string name="runtime_network_timeout">Network timeout</string>
+    <string name="runtime_export_starting">Starting export: %1$s</string>
+    <string name="runtime_export_transcoded">%1$s transcoded and exported (JPEG, %2$d%% quality)</string>
+    <string name="runtime_export_complete">%1$s exported</string>
+    <string name="runtime_export_progress">Exporting %1$s</string>
+    <string name="runtime_export_failed">Export failed: %1$s</string>
+    <string name="runtime_unknown_error">Unknown error</string>
+    <string name="runtime_ftp_started">FTP tethering started: %1$s:%2$d</string>
+    <string name="runtime_ftp_stopped">FTP service stopped</string>
+    <string name="runtime_interval_complete">Interval shooting sequence complete</string>
+    <string name="runtime_notification_maintaining_connection">AlphaPro is maintaining your Sony camera connection</string>
+    <string name="runtime_notification_waiting_handshake">Waiting for the camera Bluetooth handshake…</string>
+    <string name="runtime_notification_connected">Connected to %1$s · Syncing GPS</string>
+    <string name="runtime_notification_pairing">Pairing with system Bluetooth…</string>
+    <string name="runtime_notification_connecting">Connecting to the camera…</string>
+    <string name="runtime_notification_discovering_services">Discovering services…</string>
+    <string name="runtime_notification_handshaking">Authenticating and calibrating the clock…</string>
+    <string name="runtime_notification_disconnected">Camera asleep; standing by to reconnect</string>
+    <string name="runtime_notification_error">Camera connection error: %1$s</string>
+    <string name="runtime_notification_title">AlphaPro Sony Camera Companion</string>
+    <string name="runtime_notification_channel_name">Camera location and keep-alive service</string>
+    <string name="runtime_notification_channel_description">Continuously sends GPS coordinates to your Sony camera in the background to keep it connected.</string>
+    <plurals name="runtime_photos_loaded">
+        <item quantity="one">Loaded %1$d photo from the camera</item>
+        <item quantity="other">Loaded %1$d photos from the camera</item>
+    </plurals>
+</resources>

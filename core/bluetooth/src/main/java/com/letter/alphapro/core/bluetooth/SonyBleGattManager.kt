@@ -39,7 +39,8 @@ data class SonyWifiCredentials(
 @SuppressLint("MissingPermission")
 class SonyBleGattManager(
     private val context: Context,
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob()),
+    private val messageContext: () -> Context = { context }
 ) {
     private val _connectionState = MutableStateFlow<SonyBleConnectionState>(SonyBleConnectionState.Disconnected)
     val connectionState: StateFlow<SonyBleConnectionState> = _connectionState.asStateFlow()
@@ -145,7 +146,7 @@ class SonyBleGattManager(
     /** Only retire the exact session that failed; an old callback cannot close its replacement. */
     private fun retireGatt(gatt: BluetoothGatt) {
         if (gatt !== bluetoothGatt) return
-        traceWifi("BLE 会话关闭；等待自动重连")
+        traceWifi("BLE session closed; waiting for reconnect")
         cleanupGatt()
         _connectionState.value = SonyBleConnectionState.Disconnected
         scheduleAutoReconnect()
@@ -161,7 +162,7 @@ class SonyBleGattManager(
         val device = try {
             adapter.getRemoteDevice(address)
         } catch (_: Exception) {
-            _connectionState.value = SonyBleConnectionState.Error("无效蓝牙地址: $address")
+            _connectionState.value = SonyBleConnectionState.Error(messageContext().getString(R.string.ble_invalid_address, address))
             return
         }
 
@@ -232,7 +233,7 @@ class SonyBleGattManager(
                         when (state) {
                             BluetoothDevice.BOND_BONDED -> onBonded()
                             BluetoothDevice.BOND_NONE -> {
-                                _connectionState.value = SonyBleConnectionState.Error("蓝牙配对失败或已被取消")
+                                _connectionState.value = SonyBleConnectionState.Error(messageContext().getString(R.string.ble_pairing_failed))
                             }
                         }
                     }
@@ -332,7 +333,7 @@ class SonyBleGattManager(
         gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_BALANCED)
 
         if (gatt !== bluetoothGatt || !operationLane.isActive(gatt)) return
-        val deviceName = gatt.device.name ?: "Sony Camera"
+        val deviceName = gatt.device.name ?: messageContext().getString(R.string.ble_camera_name)
         _connectionState.value = SonyBleConnectionState.Ready(deviceName, gatt.device.address)
 
         // 8. Immediately send location if already cached!
@@ -373,11 +374,11 @@ class SonyBleGattManager(
             _wifiDiagnostic.value = ""
         }
         try {
-            val gatt = bluetoothGatt ?: throw SonyWifiSetupException("蓝牙未连接")
+            val gatt = bluetoothGatt ?: throw SonyWifiSetupException("Bluetooth is disconnected")
             if (_connectionState.value !is SonyBleConnectionState.Ready) {
-                throw SonyWifiSetupException("蓝牙尚未完成握手，请等待联机")
+                throw SonyWifiSetupException("Bluetooth handshake is not complete")
             }
-            traceWifi("开始 Wi-Fi 凭据读取；BLE MTU=" + negotiatedMtu)
+            traceWifi("Starting Wi-Fi credential read; BLE MTU=" + negotiatedMtu)
             val port = object : SonyWifiBootstrapPort {
                 override fun isReady() = gatt === bluetoothGatt && operationLane.isActive(gatt) &&
                     _connectionState.value is SonyBleConnectionState.Ready
@@ -385,17 +386,17 @@ class SonyBleGattManager(
                 override suspend fun prepareMtu() {
                     if (negotiatedMtu >= 67) return
                     val result = executeGatt(gatt, GattOperationKind.MTU, "mtu") { gatt.requestMtu(517) }
-                    traceWifi("MTU 结果 status=" + result.status + " mtu=" + negotiatedMtu)
+                    traceWifi("MTU result status=" + result.status + " mtu=" + negotiatedMtu)
                 }
                 override suspend fun subscribe(uuid: UUID): Boolean {
                     val char = findCharacteristic(gatt, uuid) ?: return false
                     return subscribeToNotifications(char)
                 }
                 override suspend fun read(uuid: UUID): ByteArray? {
-                    val char = findCharacteristic(gatt, uuid) ?: throw SonyWifiSetupException("特征已失效")
+                    val char = findCharacteristic(gatt, uuid) ?: throw SonyWifiSetupException("Characteristic is no longer available")
                     val result = executeGatt(gatt, GattOperationKind.READ, attributeKey(char)) { gatt.readCharacteristic(char) }
                     if (result.status == 5 || result.status == 15) {
-                        throw SonyWifiSetupException(uuid.toString().take(8) + "：认证/加密失败 status=" + result.status)
+                        throw SonyWifiSetupException(uuid.toString().take(8) + ": authentication/encryption failed status=" + result.status)
                     }
                     return if (result.status == BluetoothGatt.GATT_SUCCESS) result.value else null
                 }
@@ -406,15 +407,15 @@ class SonyBleGattManager(
             }
             return SonyWifiBootstrap(port, ::traceWifi).prepare()
         } catch (cancelled: CancellationException) {
-            traceWifi("用户取消 Wi-Fi 连接")
+            traceWifi("Wi-Fi setup cancelled")
             throw cancelled
         } catch (error: Exception) {
             val detail = when (error) {
-                is SonyWifiSetupException, is GattOperationException -> error.message ?: "蓝牙操作失败"
-                is SecurityException -> "缺少蓝牙权限"
-                else -> "内部错误 " + error.javaClass.simpleName
+                is SonyWifiSetupException, is GattOperationException -> error.message ?: "BLE operation failed"
+                is SecurityException -> "Bluetooth permission is missing"
+                else -> "Internal error " + error.javaClass.simpleName
             }
-            traceWifi("失败：" + detail)
+            traceWifi("Failure: " + detail)
             return null
         } finally {
             diagnosticActive = false

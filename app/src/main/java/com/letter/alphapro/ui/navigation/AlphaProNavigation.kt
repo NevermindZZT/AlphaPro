@@ -8,7 +8,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
+import com.letter.alphapro.R
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -19,16 +23,16 @@ import com.letter.alphapro.ui.remote.RemoteShutterScreen
 import com.letter.alphapro.ui.tether.TetherScreen
 import com.letter.alphapro.viewmodel.CameraViewModel
 
-enum class AlphaProDestination(val title: String, val icon: ImageVector) {
-    HUB("仪表盘", Icons.Rounded.Camera),
-    GALLERY("相机相册", Icons.Rounded.PhotoLibrary),
-    TETHER("边拍边传", Icons.Rounded.Sync),
-    REMOTE("无线快门", Icons.Rounded.RadioButtonChecked),
+enum class AlphaProDestination(@StringRes val titleRes: Int, val icon: ImageVector) {
+    HUB(R.string.nav_dashboard, Icons.Rounded.Camera),
+    GALLERY(R.string.nav_gallery, Icons.Rounded.PhotoLibrary),
+    TETHER(R.string.nav_tether, Icons.Rounded.Sync),
+    REMOTE(R.string.nav_remote, Icons.Rounded.RadioButtonChecked),
 }
 
 @Composable
 fun AlphaProApp(viewModel: CameraViewModel = viewModel()) {
-    var currentDestination by remember { mutableStateOf(AlphaProDestination.HUB) }
+    var currentDestination by rememberSaveable { mutableStateOf(AlphaProDestination.HUB) }
     val uiState by viewModel.uiState.collectAsState()
     val viewingPhoto by viewModel.viewingPhoto.collectAsState()
     val preview by viewModel.photoPreview.collectAsState()
@@ -54,8 +58,8 @@ fun AlphaProApp(viewModel: CameraViewModel = viewModel()) {
                         NavigationBarItem(
                             selected = currentDestination == destination,
                             onClick = { currentDestination = destination },
-                            icon = { Icon(destination.icon, destination.title) },
-                            label = { Text(destination.title) }
+                            icon = { Icon(destination.icon, stringResource(destination.titleRes)) },
+                            label = { Text(stringResource(destination.titleRes)) }
                         )
                     }
                 }

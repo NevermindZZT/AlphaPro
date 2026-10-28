@@ -5,9 +5,12 @@ import android.content.Context
 import android.content.Intent
 import android.net.wifi.WifiManager
 import android.os.Build
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.letter.alphapro.AlphaProApplication
+import com.letter.alphapro.R
+import com.letter.alphapro.data.AppLanguage
 import com.letter.alphapro.core.bluetooth.*
 import com.letter.alphapro.core.ftp.EmbeddedFtpServer
 import com.letter.alphapro.core.ftp.TetherIncomingPhoto
@@ -48,6 +51,9 @@ data class CameraUiState(
 )
 
 class CameraViewModel(application: Application) : AndroidViewModel(application) {
+    private fun text(@StringRes id: Int, vararg args: Any): String =
+        AppLanguage.getString(getApplication<Application>(), id, *args)
+
     val prefs = CameraPreferences(application)
     val gattManager = (application as AlphaProApplication).gattManager
     val shutterController = SonyRemoteShutterController(gattManager)
@@ -55,7 +61,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     val ptpClient = PtpIpClient()
     val ptpDownloader = PtpPhotoDownloader(application, ptpClient)
     val heifTranscoder = HeifTranscoder()
-    private val bleScanner = SonyBleScanner(application)
+    private val bleScanner = SonyBleScanner(application, messageContext = { AppLanguage.localizedContext(application) })
 
     private val ftpStorageDir = File(application.getExternalFilesDir(null), "tether_ftp").apply { mkdirs() }
     val ftpServer = EmbeddedFtpServer(ftpStorageDir, 2121, viewModelScope)
@@ -141,7 +147,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
 
         // Auto-reconnect to last paired camera on launch
         prefs.pairedDeviceAddress?.let { address ->
-            connectCamera(address, prefs.pairedDeviceName ?: "Sony Camera")
+            connectCamera(address, prefs.pairedDeviceName ?: text(R.string.runtime_camera_name_fallback))
         }
     }
 
@@ -191,7 +197,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
 
     fun reconnectCamera() {
         val address = prefs.pairedDeviceAddress ?: return
-        val name = prefs.pairedDeviceName ?: "Sony Camera"
+        val name = prefs.pairedDeviceName ?: text(R.string.runtime_camera_name_fallback)
         connectCamera(address, name)
     }
 
@@ -226,7 +232,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val success = gattManager.sendTimeSync()
             _uiState.update {
-                it.copy(userNotice = if (success) "相机时钟校准成功 (已与手机精确同步)" else "校准失败，请确认蓝牙已连接")
+                it.copy(userNotice = if (success) text(R.string.runtime_time_sync_success) else text(R.string.runtime_time_sync_failed))
             }
         }
     }
@@ -235,32 +241,32 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         // Set busy before launching or reading credentials, so repeated taps cannot queue bootstraps.
         if (wifiJob?.isActive == true || _uiState.value.wifiState is CameraWifiState.Connecting) return
         if (gattManager.connectionState.value !is SonyBleConnectionState.Ready) {
-            _uiState.update { it.copy(userNotice = "请等待相机蓝牙完成握手后再连接 Wi-Fi") }
+            _uiState.update { it.copy(userNotice = text(R.string.runtime_wifi_wait_for_bluetooth)) }
             return
         }
         val wifiManager = getApplication<Application>().getSystemService(WifiManager::class.java)
         if (wifiManager?.isWifiEnabled == false) {
-            _uiState.update { it.copy(userNotice = "请先开启手机 Wi-Fi") }
+            _uiState.update { it.copy(userNotice = text(R.string.runtime_wifi_enable_phone)) }
             return
         }
         _uiState.update { it.copy(wifiState = CameraWifiState.Connecting, wifiFailureDiagnostic = null,
-            userNotice = "正在通过蓝牙读取热点信息…") }
+            userNotice = text(R.string.runtime_wifi_reading_credentials)) }
         wifiJob = viewModelScope.launch {
             fun fail(message: String) {
                 _uiState.update { it.copy(wifiState = CameraWifiState.Error(message), userNotice = message,
-                    wifiFailureDiagnostic = "Wi-Fi 诊断 W2 · " + com.letter.alphapro.BuildConfig.VERSION_NAME +
-                        "\n" + gattManager.wifiDiagnostic.value + "\n" + message) }
+                    wifiFailureDiagnostic = text(R.string.runtime_wifi_diagnostic, com.letter.alphapro.BuildConfig.VERSION_NAME,
+                        gattManager.wifiDiagnostic.value, message)) }
             }
             try {
                 val credentials = gattManager.readWifiCredentials()
                 if (credentials == null) {
-                    fail("相机热点信息读取失败，请查看诊断详情")
+                    fail(text(R.string.runtime_wifi_credentials_failed))
                     return@launch
                 }
                 // Do not copy passwords to the system clipboard automatically.
                 prefs.lastWifiSsid = credentials.ssid
                 prefs.lastWifiPassword = credentials.password
-                _uiState.update { it.copy(userNotice = "热点信息已读取，等待系统 Wi-Fi 连接确认…") }
+                _uiState.update { it.copy(userNotice = text(R.string.runtime_wifi_awaiting_confirmation)) }
                 wifiConnector.connectCameraWifi(credentials.ssid, credentials.password)
                     .collect { state ->
                         val previous = _uiState.value.wifiState
@@ -269,18 +275,18 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                             is CameraWifiState.Connected -> {
                                 if (previous !is CameraWifiState.Connected || previous.network != state.network ||
                                     previous.gatewayIp != state.gatewayIp) {
-                                    _uiState.update { it.copy(userNotice = "Wi-Fi 已连接，正在读取照片…") }
+                                    _uiState.update { it.copy(userNotice = text(R.string.runtime_wifi_connected_loading)) }
                                     loadCameraMedia(state.gatewayIp, state.network)
                                 }
                             }
-                            is CameraWifiState.Error -> fail("热点信息已读取；" + state.message)
+                            is CameraWifiState.Error -> fail(text(R.string.runtime_wifi_connection_failed, state.message))
                             else -> Unit
                         }
                     }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                fail("Wi-Fi 流程异常：" + error.javaClass.simpleName)
+                fail(text(R.string.runtime_wifi_process_failed, error.javaClass.simpleName))
             } finally {
                 if (_uiState.value.wifiState is CameraWifiState.Connecting) {
                     _uiState.update { it.copy(wifiState = CameraWifiState.Idle) }
@@ -301,7 +307,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
             closePhoto()
             photoLoader.reset()
             ptpClient.disconnect()
-            _uiState.update { it.copy(wifiState = CameraWifiState.Idle, mediaItems = emptyList(), userNotice = "Wi-Fi 已断开") }
+            _uiState.update { it.copy(wifiState = CameraWifiState.Idle, mediaItems = emptyList(), userNotice = text(R.string.runtime_wifi_disconnected)) }
         }
     }
 
@@ -320,14 +326,15 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                     it.copy(
                         mediaItems = photos.reversed(), // Latest first
                         isMediaLoading = false,
-                        userNotice = if (photos.isNotEmpty()) "已载入 " + photos.size.toString() + " 张机内照片" else "存储卡内暂无照片"
+                        userNotice = if (photos.isNotEmpty()) AppLanguage.localizedContext(getApplication<Application>()).resources
+                            .getQuantityString(R.plurals.runtime_photos_loaded, photos.size, photos.size) else text(R.string.runtime_no_photos)
                     )
                 }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
                         isMediaLoading = false,
-                        userNotice = "读取相机存储卡失败: " + (e.message ?: "网络超时")
+                        userNotice = text(R.string.runtime_media_load_failed, e.message ?: text(R.string.runtime_network_timeout))
                     )
                 }
             }
@@ -340,14 +347,14 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         jpegQuality: Int = 95
     ) {
         viewModelScope.launch {
-            _uiState.update { it.copy(userNotice = "开始导出 " + metadata.filename) }
+            _uiState.update { it.copy(userNotice = text(R.string.runtime_export_starting, metadata.filename)) }
             try {
                 if (transcodeToJpeg && metadata.isHeif) {
                     val tempHeif = ptpDownloader.downloadToTempFile(metadata)
                     val targetJpeg = File(tempHeif.parentFile, metadata.filename.substringBeforeLast(".") + ".jpg")
                     heifTranscoder.transcodeHeifToJpeg(tempHeif, targetJpeg, jpegQuality)
                     tempHeif.delete()
-                    _uiState.update { it.copy(userNotice = metadata.filename + " 转码导出完成 (95% JPEG)") }
+                    _uiState.update { it.copy(userNotice = text(R.string.runtime_export_transcoded, metadata.filename, jpegQuality)) }
                 } else {
                     ptpDownloader.downloadToMediaStore(metadata).collect { progress ->
                         _uiState.update { current ->
@@ -355,13 +362,13 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                             map[metadata.filename] = progress.bytesDownloaded.toFloat() / progress.totalBytes.toFloat()
                             current.copy(
                                 downloadProgressMap = map,
-                                userNotice = if (progress.isComplete) metadata.filename + " 导出完成" else "正在导出 " + metadata.filename
+                                userNotice = if (progress.isComplete) text(R.string.runtime_export_complete, metadata.filename) else text(R.string.runtime_export_progress, metadata.filename)
                             )
                         }
                     }
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(userNotice = "导出失败: " + (e.message ?: "未知异常")) }
+                _uiState.update { it.copy(userNotice = text(R.string.runtime_export_failed, e.message ?: text(R.string.runtime_unknown_error))) }
             }
         }
     }
@@ -396,10 +403,10 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         if (enabled) {
             ftpServer.start()
             val ip = getLocalIpAddress()
-            _uiState.update { it.copy(isFtpServerRunning = true, localFtpIp = ip, userNotice = "FTP 边拍边传已启动: " + (ip ?: "0.0.0.0") + ":2121") }
+            _uiState.update { it.copy(isFtpServerRunning = true, localFtpIp = ip, userNotice = text(R.string.runtime_ftp_started, ip ?: "0.0.0.0", 2121)) }
         } else {
             ftpServer.stop()
-            _uiState.update { it.copy(isFtpServerRunning = false, userNotice = "FTP 服务已停止") }
+            _uiState.update { it.copy(isFtpServerRunning = false, userNotice = text(R.string.runtime_ftp_stopped)) }
         }
     }
 
@@ -436,7 +443,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
             shutterController.executeIntervalometer(intervalSec, totalShots) { current, total ->
                 _uiState.update { it.copy(activeIntervalRemaining = total - current) }
             }
-            _uiState.update { it.copy(activeIntervalRemaining = null, userNotice = "延时拍摄序列完成") }
+            _uiState.update { it.copy(activeIntervalRemaining = null, userNotice = text(R.string.runtime_interval_complete)) }
         }
     }
 

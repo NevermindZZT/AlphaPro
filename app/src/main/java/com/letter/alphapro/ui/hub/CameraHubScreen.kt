@@ -13,6 +13,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.letter.alphapro.R
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -47,11 +50,11 @@ fun CameraHubScreen(
                 title = {
                     Column {
                         Text(
-                            text = "AlphaPro",
+                            text = stringResource(R.string.control_app_name),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                         )
                         Text(
-                            text = "索尼相机专业伴侣",
+                            text = stringResource(R.string.control_hub_subtitle),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -62,13 +65,13 @@ fun CameraHubScreen(
                         showScanDialog = true
                         viewModel.startScan(sonyOnly = true)
                     }) {
-                        Icon(Icons.Rounded.BluetoothSearching, contentDescription = "搜索配对相机")
+                        Icon(Icons.Rounded.BluetoothSearching, contentDescription = stringResource(R.string.control_search_cameras))
                     }
                     AlphaIconButton(onClick = {
                         val intent = android.content.Intent(context, com.letter.alphapro.ui.settings.SettingsActivity::class.java)
                         context.startActivity(intent)
                     }) {
-                        Icon(Icons.Rounded.Settings, contentDescription = "设置")
+                        Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.control_settings))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -100,7 +103,7 @@ fun CameraHubScreen(
             )
 
             Text(
-                text = "控制中心与状态",
+                text = stringResource(R.string.control_hub_controls),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -147,7 +150,7 @@ fun CameraHubScreen(
             RecentCaptureCard(
                 mediaItemsCount = uiState.mediaItems.size,
                 latestItemName = uiState.mediaItems.firstOrNull()?.filename,
-                latestItemFormat = if (uiState.mediaItems.firstOrNull()?.isHeif == true) "10-bit HEIF" else "RAW/JPEG"
+                latestItemFormat = if (uiState.mediaItems.firstOrNull()?.isHeif == true) stringResource(R.string.control_format_heif) else stringResource(R.string.control_format_raw_jpeg)
             )
         }
 
@@ -199,13 +202,13 @@ private fun DynamicCameraHeroCard(
                         else -> MaterialTheme.colorScheme.outline
                     }
                     val statusText = when (bleState) {
-                        is SonyBleConnectionState.Ready -> "蓝牙已联机 · 正在打卡"
-                        is SonyBleConnectionState.Pairing -> "正在配对..."
-                        is SonyBleConnectionState.Connecting -> "正在连接..."
-                        is SonyBleConnectionState.Handshaking -> "鉴权校准中..."
-                        is SonyBleConnectionState.DiscoveringServices -> "发现服务中..."
-                        is SonyBleConnectionState.Disconnected -> if (pairedAddress != null) "相机休眠 · 待命重连" else "未配对相机"
-                        is SonyBleConnectionState.Error -> "连接异常"
+                        is SonyBleConnectionState.Ready -> stringResource(R.string.control_ble_online)
+                        is SonyBleConnectionState.Pairing -> stringResource(R.string.control_ble_pairing)
+                        is SonyBleConnectionState.Connecting -> stringResource(R.string.control_ble_connecting)
+                        is SonyBleConnectionState.Handshaking -> stringResource(R.string.control_ble_handshaking)
+                        is SonyBleConnectionState.DiscoveringServices -> stringResource(R.string.control_ble_discovering)
+                        is SonyBleConnectionState.Disconnected -> if (pairedAddress != null) stringResource(R.string.control_ble_sleeping) else stringResource(R.string.control_ble_unpaired)
+                        is SonyBleConnectionState.Error -> stringResource(R.string.control_ble_error)
                     }
                     Box(
                         modifier = Modifier
@@ -240,7 +243,7 @@ private fun DynamicCameraHeroCard(
                                 modifier = Modifier,
                                 size = AlphaButtonSize.Compact
                             ) {
-                                Text("断开连接")
+                                Text(stringResource(R.string.control_disconnect))
                             }
                         } else if (!isConnecting) {
                             AlphaButton(
@@ -250,7 +253,7 @@ private fun DynamicCameraHeroCard(
                             ) {
                                 Icon(Icons.Rounded.BluetoothConnected, contentDescription = null, modifier = Modifier.size(AlphaButtonSize.Compact.iconSize))
                                 Spacer(modifier = Modifier.width(AlphaButtonSize.Compact.iconSpacing))
-                                Text("重新连接")
+                                Text(stringResource(R.string.control_reconnect))
                             }
                         } else {
                             AlphaOutlinedButton(
@@ -258,14 +261,14 @@ private fun DynamicCameraHeroCard(
                                 modifier = Modifier,
                                 size = AlphaButtonSize.Compact
                             ) {
-                                Text("取消")
+                                Text(stringResource(R.string.control_cancel))
                             }
                         }
 
                         AlphaIconButton(onClick = onForgetDevice) {
                             Icon(
                                 imageVector = Icons.Rounded.DeleteOutline,
-                                contentDescription = "解除配对",
+                                contentDescription = stringResource(R.string.control_forget_camera),
                                 modifier = Modifier.size(AlphaButtonDefaults.IconSize),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -283,13 +286,13 @@ private fun DynamicCameraHeroCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = pairedName ?: "尚未配对索尼相机",
+                        text = pairedName ?: stringResource(R.string.control_no_sony_paired),
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = if (pairedAddress != null) "MAC: " + pairedAddress else "支持 A7M4, A7R5, A6700, A7C2, ZV-E1 等机型",
+                        text = if (pairedAddress != null) stringResource(R.string.control_mac_address, pairedAddress) else stringResource(R.string.control_supported_cameras),
                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -311,7 +314,7 @@ private fun DynamicCameraHeroCard(
                 ) {
                     Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(AlphaButtonDefaults.IconSize))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("搜索并配对索尼相机")
+                    Text(stringResource(R.string.control_pair_sony))
                 }
             }
         }
@@ -358,12 +361,12 @@ private fun BentoGpsCard(
 
             Column {
                 Text(
-                    text = "后台 GPS 永续同步",
+                    text = stringResource(R.string.control_gps_sync),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = if (enabled && isConnected) "活跃打卡中 (每5秒)" else if (enabled) "服务待命 (等待相机开机)" else "已关闭打卡",
+                    text = if (enabled && isConnected) stringResource(R.string.control_gps_active, 5) else if (enabled) stringResource(R.string.control_gps_waiting) else stringResource(R.string.control_gps_off),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -414,7 +417,7 @@ private fun BentoWifiCard(
                     color = MaterialTheme.colorScheme.surface
                 ) {
                     Text(
-                        text = if (isConnected) "PTP在线" else "Wi-Fi直连",
+                        text = if (isConnected) stringResource(R.string.control_ptp_online) else stringResource(R.string.control_wifi_direct),
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         style = MaterialTheme.typography.labelSmall
                     )
@@ -423,7 +426,7 @@ private fun BentoWifiCard(
 
             Column {
                 Text(
-                    text = if (isConnected) "相机 Wi-Fi 已连" else "相机 Wi-Fi 直连",
+                    text = if (isConnected) stringResource(R.string.control_wifi_connected) else stringResource(R.string.control_camera_wifi),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     color = if (isConnected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                 )
@@ -438,7 +441,7 @@ private fun BentoWifiCard(
                         AlphaButtonProgress(size = AlphaButtonSize.Compact)
                     } else {
                         Text(
-                            text = if (isConnected) "断开 Wi-Fi" else "一键秒连"
+                            text = if (isConnected) stringResource(R.string.control_wifi_disconnect) else stringResource(R.string.control_wifi_connect)
                         )
                     }
                 }
@@ -480,18 +483,18 @@ private fun BentoTimeSyncCard(
                 AlphaIconButton(onClick = onSync, enabled = isBleConnected) {
                     Icon(
                         imageVector = Icons.Rounded.Sync,
-                        contentDescription = "同步",
+                        contentDescription = stringResource(R.string.control_sync),
                         modifier = Modifier.size(AlphaButtonDefaults.IconSize)
                     )
                 }
             }
             Column {
                 Text(
-                    text = "自动时钟校准",
+                    text = stringResource(R.string.control_clock_sync),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                 )
                 Text(
-                    text = if (isBleConnected) "点击同步机身时钟" else "请先连接相机蓝牙",
+                    text = if (isBleConnected) stringResource(R.string.control_clock_sync_hint) else stringResource(R.string.control_connect_bluetooth_first),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -539,12 +542,12 @@ private fun BentoFtpCard(
             }
             Column {
                 Text(
-                    text = "FTP 边拍边传",
+                    text = stringResource(R.string.control_ftp_tether),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     color = if (enabled) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = if (enabled) (localIp ?: "127.0.0.1") + ":2121" else "端口 2121 待命",
+                    text = if (enabled) stringResource(R.string.control_ftp_endpoint, localIp ?: "127.0.0.1", 2121) else stringResource(R.string.control_ftp_port_standby, 2121),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -590,7 +593,7 @@ private fun RecentCaptureCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = latestItemName ?: "存储卡照片预览",
+                    text = latestItemName ?: stringResource(R.string.control_card_preview),
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
@@ -598,7 +601,7 @@ private fun RecentCaptureCard(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = if (mediaItemsCount > 0) "已载入 $mediaItemsCount 张照片 · $latestItemFormat" else "请连接相机 Wi-Fi 载入照片",
+                    text = if (mediaItemsCount > 0) pluralStringResource(R.plurals.control_photos_loaded, mediaItemsCount, mediaItemsCount, latestItemFormat) else stringResource(R.string.control_photos_connect_wifi),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

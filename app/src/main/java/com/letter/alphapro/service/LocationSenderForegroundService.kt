@@ -5,13 +5,20 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import android.content.res.Configuration
+import androidx.core.content.ContextCompat
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import androidx.annotation.StringRes
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.letter.alphapro.AlphaProApplication
+import com.letter.alphapro.R
+import com.letter.alphapro.data.AppLanguage
 import com.letter.alphapro.core.bluetooth.SonyBleConnectionState
 import com.letter.alphapro.core.bluetooth.SonyBleGattManager
 import com.letter.alphapro.core.location.AdaptiveLocationEngine
@@ -20,6 +27,9 @@ import kotlinx.coroutines.*
 import java.io.File
 
 class LocationSenderForegroundService : Service() {
+    private fun text(@StringRes id: Int, vararg args: Any): String =
+        AppLanguage.getString(this, id, *args)
+
     companion object {
         const val CHANNEL_ID = "alphapro_location_channel"
         const val NOTIFICATION_ID = 1001
@@ -31,6 +41,11 @@ class LocationSenderForegroundService : Service() {
     private lateinit var locationEngine: AdaptiveLocationEngine
     private lateinit var gpxLogger: GpxTrackLogger
 
+    private val languageReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (::gattManager.isInitialized && activeJob != null) refreshNotification()
+        }
+    }
     private var activeJob: Job? = null
     private var lastSentCoordinate: Pair<Double, Double>? = null
 
@@ -42,10 +57,11 @@ class LocationSenderForegroundService : Service() {
         gattManager = app.gattManager
         locationEngine = app.locationEngine
         gpxLogger = app.gpxLogger
+        ContextCompat.registerReceiver(this, languageReceiver, IntentFilter(AppLanguage.ACTION_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val notification = buildNotification("AlphaPro 正在守护索尼相机连接", "等待相机蓝牙握手...")
+        val notification = buildNotification(text(R.string.runtime_notification_maintaining_connection), text(R.string.runtime_notification_waiting_handshake))
         val serviceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
         } else {
@@ -69,18 +85,7 @@ class LocationSenderForegroundService : Service() {
             // 1. Observe connection state for notifications
             launch {
                 gattManager.connectionState.collect { state ->
-                    val statusText = when (state) {
-                        is SonyBleConnectionState.Ready -> "已联机 ${state.deviceName} · 正在同步 GPS"
-                        is SonyBleConnectionState.Pairing -> "正在进行系统蓝牙配对..."
-                        is SonyBleConnectionState.Connecting -> "正在连接相机..."
-                        is SonyBleConnectionState.DiscoveringServices -> "正在发现服务..."
-                        is SonyBleConnectionState.Handshaking -> "正在进行鉴权与时钟校准..."
-                        is SonyBleConnectionState.Disconnected -> "相机已休眠，待命重连中"
-                        is SonyBleConnectionState.Error -> "错误: ${state.message}"
-                    }
-                    val notification = buildNotification("AlphaPro 索尼相机伴侣", statusText)
-                    val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    manager.notify(NOTIFICATION_ID, notification)
+                    refreshNotification(state)
                 }
             }
 
@@ -118,8 +123,29 @@ class LocationSenderForegroundService : Service() {
         }
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (::gattManager.isInitialized && activeJob != null) refreshNotification()
+    }
+
+    private fun refreshNotification(state: SonyBleConnectionState = gattManager.connectionState.value) {
+        createNotificationChannel()
+        val status = when (state) {
+            is SonyBleConnectionState.Ready -> text(R.string.runtime_notification_connected, state.deviceName)
+            is SonyBleConnectionState.Pairing -> text(R.string.runtime_notification_pairing)
+            is SonyBleConnectionState.Connecting -> text(R.string.runtime_notification_connecting)
+            is SonyBleConnectionState.DiscoveringServices -> text(R.string.runtime_notification_discovering_services)
+            is SonyBleConnectionState.Handshaking -> text(R.string.runtime_notification_handshaking)
+            is SonyBleConnectionState.Disconnected -> text(R.string.runtime_notification_disconnected)
+            is SonyBleConnectionState.Error -> text(R.string.runtime_notification_error, state.message)
+        }
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(NOTIFICATION_ID, buildNotification(text(R.string.runtime_notification_title), status))
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        try { unregisterReceiver(languageReceiver) } catch (_: IllegalArgumentException) {}
         gpxLogger.flush()
         serviceScope.cancel()
     }
@@ -130,10 +156,10 @@ class LocationSenderForegroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "相机定位与保活服务",
+                text(R.string.runtime_notification_channel_name),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "保持后台向索尼微单持续发送 GPS 坐标，防止相机休眠断连"
+                description = text(R.string.runtime_notification_channel_description)
             }
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)

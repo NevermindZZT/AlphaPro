@@ -23,10 +23,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.letter.alphapro.R
 import com.letter.alphapro.data.AppThemeMode
 import com.letter.alphapro.data.DefaultHeifPolicy
 import com.letter.alphapro.data.GpsInterval
@@ -68,7 +71,7 @@ fun SettingsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "设置与偏好",
+                        text = stringResource(R.string.settings_title),
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                     )
                 },
@@ -76,7 +79,7 @@ fun SettingsScreen(
                     AlphaIconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.Rounded.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.settings_back),
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -102,19 +105,21 @@ fun SettingsScreen(
                 },
                 onCopyRepo = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("GitHub Repo", GITHUB_REPO_URL))
+                    clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.settings_repo_clip_label), GITHUB_REPO_URL))
                 }
             )
 
+            AppLanguageSettings()
+
             // 2. Appearance & Theme Settings Group
-            SettingsSectionHeader(title = "外观与主题", icon = Icons.Rounded.Palette)
+            SettingsSectionHeader(title = stringResource(R.string.settings_appearance), icon = Icons.Rounded.Palette)
             SettingsCard {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Text(
-                        text = "主题显示模式",
+                        text = stringResource(R.string.settings_theme_mode),
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                     )
                     AlphaSingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -125,7 +130,7 @@ fun SettingsScreen(
                                 index = index,
                                 count = AppThemeMode.entries.size
                             ) {
-                                Text(mode.label)
+                                Text(stringResource(mode.labelRes))
                             }
                         }
                     }
@@ -133,8 +138,8 @@ fun SettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                     SettingsSwitchRow(
-                        title = "Material You 动态色彩",
-                        subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "根据系统壁纸自动提取莫奈色盘；关闭后使用 AlphaPro 经典索尼极光橙" else "需要 Android 12 以上系统支持",
+                        title = stringResource(R.string.settings_dynamic_color),
+                        subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) stringResource(R.string.settings_dynamic_color_description) else stringResource(R.string.settings_dynamic_color_requirement),
                         icon = Icons.Rounded.ColorLens,
                         checked = dynamicColor,
                         enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
@@ -144,15 +149,15 @@ fun SettingsScreen(
             }
 
             // 3. GPS & Track Settings Group
-            SettingsSectionHeader(title = "GPS 定位与航迹打卡", icon = Icons.Rounded.MyLocation)
+            SettingsSectionHeader(title = stringResource(R.string.settings_gps_tracks), icon = Icons.Rounded.MyLocation)
             SettingsCard {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     SettingsSwitchRow(
-                        title = "自动 GPS 定位同步",
-                        subtitle = "蓝牙联机后自动将手机高精度经纬度与海拔写入索尼微单机身",
+                        title = stringResource(R.string.settings_gps_sync),
+                        subtitle = stringResource(R.string.settings_gps_sync_description),
                         icon = Icons.Rounded.GpsFixed,
                         checked = uiState.isGpsSyncActive,
                         onCheckedChange = { viewModel.toggleGpsSync(it) }
@@ -161,11 +166,11 @@ fun SettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                     Text(
-                        text = "定位心跳发送频率",
+                        text = stringResource(R.string.settings_gps_interval),
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                     )
                     Text(
-                        text = "向相机发送 GPS 坐标心跳包的周期。推荐使用 5 秒，防止相机看门狗超时亮起禁止图标。",
+                        text = stringResource(R.string.settings_gps_interval_description),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -177,7 +182,7 @@ fun SettingsScreen(
                                 index = index,
                                 count = GpsInterval.entries.size
                             ) {
-                                Text(interval.label)
+                                Text(stringResource(interval.labelRes))
                             }
                         }
                     }
@@ -185,14 +190,15 @@ fun SettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                     SettingsSwitchRow(
-                        title = "后台 GPX 轨迹记录",
-                        subtitle = "在联机期间自动将拍摄外景路线保存为标准 .gpx 文件，便于导入 Lightroom 或 Google Earth",
+                        title = stringResource(R.string.settings_gpx_logging),
+                        subtitle = stringResource(R.string.settings_gpx_logging_description),
                         icon = Icons.Rounded.Route,
                         checked = isGpxLogging,
                         onCheckedChange = { viewModel.setGpxLogging(it) }
                     )
 
                     if (isGpxLogging) {
+                        val gpxPointCount = viewModel.getGpxPointCount()
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -211,13 +217,13 @@ fun SettingsScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "公开路径: 内部存储 / Documents / AlphaPro / Tracks /",
+                                        text = stringResource(R.string.settings_gpx_path),
                                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                                 Text(
-                                    text = "文件管理直接可见 · 今日已记录 " + viewModel.getGpxPointCount().toString() + " 点 (每分钟自动保存)",
+                                    text = pluralStringResource(R.plurals.settings_gpx_point_count, gpxPointCount, gpxPointCount),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -241,14 +247,14 @@ fun SettingsScreen(
                                                         putExtra(Intent.EXTRA_STREAM, uri)
                                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                                     }
-                                                    context.startActivity(Intent.createChooser(shareIntent, "导出 / 分享 GPX 轨迹"))
+                                                    context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.settings_gpx_share_chooser)))
                                                 } catch (_: Exception) {}
                                             }
                                         }
                                     ) {
                                         Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(20.dp))
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text("导出 / 分享今日轨迹")
+                                        Text(stringResource(R.string.settings_gpx_share_today))
                                     }
                                 }
                             }
@@ -258,18 +264,18 @@ fun SettingsScreen(
             }
 
             // 4. Gallery & 10-bit HEIF Export Settings Group
-            SettingsSectionHeader(title = "相册与 10-bit HEIF 导出", icon = Icons.Rounded.PhotoLibrary)
+            SettingsSectionHeader(title = stringResource(R.string.settings_gallery_heif), icon = Icons.Rounded.PhotoLibrary)
             SettingsCard {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Text(
-                        text = "10-bit HEIF 默认导出策略",
+                        text = stringResource(R.string.settings_heif_policy),
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                     )
                     Text(
-                        text = "解决官方 Creators' App 在 Android 端无法导出 10-bit HEIF (HIF) 的核心问题。",
+                        text = stringResource(R.string.settings_heif_policy_description),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -281,7 +287,7 @@ fun SettingsScreen(
                                 index = index,
                                 count = DefaultHeifPolicy.entries.size
                             ) {
-                                Text(policy.label)
+                                Text(stringResource(policy.labelRes))
                             }
                         }
                     }
@@ -295,11 +301,11 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "JPEG 转码压缩品质",
+                                text = stringResource(R.string.settings_jpeg_quality),
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                             )
                             Text(
-                                text = "当前品质: $jpegQuality% (推荐 95%，近无损色彩同时保留所有相机 EXIF 参数)",
+                                text = stringResource(R.string.settings_jpeg_quality_description, jpegQuality),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -317,15 +323,15 @@ fun SettingsScreen(
             }
 
             // 5. Connectivity & Device Management
-            SettingsSectionHeader(title = "连接与自动化", icon = Icons.Rounded.BluetoothSearching)
+            SettingsSectionHeader(title = stringResource(R.string.settings_connectivity), icon = Icons.Rounded.BluetoothSearching)
             SettingsCard {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     SettingsSwitchRow(
-                        title = "相机开机系统级自动唤醒",
-                        subtitle = "利用 CompanionDeviceManager 在场感知。相机开机发射蓝牙信标时，系统自动拉起前台服务同步 GPS",
+                        title = stringResource(R.string.settings_auto_wake),
+                        subtitle = stringResource(R.string.settings_auto_wake_description),
                         icon = Icons.Rounded.PowerSettingsNew,
                         checked = autoWake,
                         onCheckedChange = { viewModel.setAutoWake(it) }
@@ -339,11 +345,15 @@ fun SettingsScreen(
                     ) {
                         Column {
                             Text(
-                                text = "当前已配对相机",
+                                text = stringResource(R.string.settings_paired_camera),
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                             )
                             Text(
-                                text = if (uiState.pairedAddress != null) (uiState.pairedName ?: "索尼微单") + " · " + uiState.pairedAddress else "尚未配对任何相机机身",
+                                text = if (uiState.pairedAddress != null) stringResource(
+                                    R.string.settings_paired_camera_details,
+                                    uiState.pairedName ?: stringResource(R.string.settings_camera_fallback),
+                                    uiState.pairedAddress.orEmpty()
+                                ) else stringResource(R.string.settings_no_paired_camera),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontFamily = FontFamily.Monospace
@@ -357,7 +367,7 @@ fun SettingsScreen(
                             ) {
                                 Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("清除记忆")
+                                Text(stringResource(R.string.settings_forget_camera))
                             }
                         }
                     }
@@ -365,14 +375,14 @@ fun SettingsScreen(
             }
 
             // 6. About & Open Source Credits
-            SettingsSectionHeader(title = "关于项目与开源致谢", icon = Icons.Rounded.Info)
+            SettingsSectionHeader(title = stringResource(R.string.settings_about), icon = Icons.Rounded.Info)
             SettingsCard {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "AlphaPro 致力于为索尼全画幅与 APS-C 微单摄影师提供纯粹、现代、开源的 Android 端伴侣工具。旨在根除官方 Creators' App 蓝牙定位频繁掉线、拒绝导出 10-bit HEIF 等长期痛点。",
+                        text = stringResource(R.string.settings_project_description),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -380,11 +390,11 @@ fun SettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                     Text(
-                        text = "开源社区致谢：",
+                        text = stringResource(R.string.settings_credits_title),
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
                     )
                     Text(
-                        text = "特别感谢 AlphaGPS、sony_geotagging 以及 Freemote 社区对索尼微单蓝牙协议与 PTP/IP 架构的逆向研究与探索。",
+                        text = stringResource(R.string.settings_credits_description),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -408,7 +418,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "开放源码协议：Apache License 2.0",
+                                text = stringResource(R.string.settings_license),
                                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -425,8 +435,8 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
             icon = { Icon(Icons.Rounded.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text("解除相机配对记忆？") },
-            text = { Text("解除后应用将不再自动连接该相机，切换新机身或重新配对时可执行此操作。") },
+            title = { Text(stringResource(R.string.settings_forget_title)) },
+            text = { Text(stringResource(R.string.settings_forget_description)) },
             confirmButton = {
                 AlphaButton(
                     onClick = {
@@ -435,12 +445,12 @@ fun SettingsScreen(
                     },
                     colors = AlphaButtonDefaults.destructiveColors()
                 ) {
-                    Text("确认解除")
+                    Text(stringResource(R.string.settings_forget_confirm))
                 }
             },
             dismissButton = {
                 AlphaTextButton(onClick = { showClearDialog = false }) {
-                    Text("取消")
+                    Text(stringResource(R.string.settings_cancel))
                 }
             }
         )
@@ -493,7 +503,7 @@ private fun ProjectHeroCard(
                             color = MaterialTheme.colorScheme.primaryContainer
                         ) {
                             Text(
-                                text = "v$version",
+                                text = stringResource(R.string.settings_version, version),
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold,
@@ -504,7 +514,7 @@ private fun ProjectHeroCard(
                         }
                     }
                     Text(
-                        text = "索尼微单开源伴侣 · 专为摄影师打造",
+                        text = stringResource(R.string.settings_project_tagline),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -535,7 +545,7 @@ private fun ProjectHeroCard(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "GitHub 开源项目仓库",
+                            text = stringResource(R.string.settings_repo_title),
                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
                         )
                         Text(
@@ -551,7 +561,7 @@ private fun ProjectHeroCard(
                     AlphaIconButton(onClick = onOpenRepo) {
                         Icon(
                             imageVector = Icons.Rounded.OpenInNew,
-                            contentDescription = "在浏览器中查看",
+                            contentDescription = stringResource(R.string.settings_open_browser),
                             modifier = Modifier.size(20.dp)
                         )
                     }

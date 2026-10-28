@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="runtime_camera_name_fallback">索尼相机</string>
+    <string name="runtime_time_sync_success">相机时钟校准成功（已与手机精确同步）</string>
+    <string name="runtime_time_sync_failed">校准失败，请确认蓝牙已连接</string>
+    <string name="runtime_wifi_wait_for_bluetooth">请等待相机蓝牙完成握手后再连接 Wi-Fi</string>
+    <string name="runtime_wifi_enable_phone">请先开启手机 Wi-Fi</string>
+    <string name="runtime_wifi_reading_credentials">正在通过蓝牙读取热点信息…</string>
+    <string name="runtime_wifi_diagnostic">Wi-Fi 诊断 W2 · %1$s\n%2$s\n%3$s</string>
+    <string name="runtime_wifi_credentials_failed">相机热点信息读取失败，请查看诊断详情</string>
+    <string name="runtime_wifi_awaiting_confirmation">热点信息已读取，等待系统 Wi-Fi 连接确认…</string>
+    <string name="runtime_wifi_connected_loading">Wi-Fi 已连接，正在读取照片…</string>
+    <string name="runtime_wifi_connection_failed">热点信息已读取；Wi-Fi 连接失败：%1$s</string>
+    <string name="runtime_wifi_process_failed">Wi-Fi 流程异常：%1$s</string>
+    <string name="runtime_wifi_disconnected">Wi-Fi 已断开</string>
+    <string name="runtime_no_photos">存储卡内暂无照片</string>
+    <string name="runtime_media_load_failed">读取相机存储卡失败：%1$s</string>
+    <string name="runtime_network_timeout">网络超时</string>
+    <string name="runtime_export_starting">开始导出 %1$s</string>
+    <string name="runtime_export_transcoded">%1$s 转码导出完成（JPEG，%2$d%% 画质）</string>
+    <string name="runtime_export_complete">%1$s 导出完成</string>
+    <string name="runtime_export_progress">正在导出 %1$s</string>
+    <string name="runtime_export_failed">导出失败：%1$s</string>
+    <string name="runtime_unknown_error">未知异常</string>
+    <string name="runtime_ftp_started">FTP 边拍边传已启动：%1$s:%2$d</string>
+    <string name="runtime_ftp_stopped">FTP 服务已停止</string>
+    <string name="runtime_interval_complete">延时拍摄序列完成</string>
+    <string name="runtime_notification_maintaining_connection">AlphaPro 正在守护索尼相机连接</string>
+    <string name="runtime_notification_waiting_handshake">等待相机蓝牙握手…</string>
+    <string name="runtime_notification_connected">已联机 %1$s · 正在同步 GPS</string>
+    <string name="runtime_notification_pairing">正在进行系统蓝牙配对…</string>
+    <string name="runtime_notification_connecting">正在连接相机…</string>
+    <string name="runtime_notification_discovering_services">正在发现服务…</string>
+    <string name="runtime_notification_handshaking">正在进行鉴权与时钟校准…</string>
+    <string name="runtime_notification_disconnected">相机已休眠，待命重连中</string>
+    <string name="runtime_notification_error">相机连接错误：%1$s</string>
+    <string name="runtime_notification_title">AlphaPro 索尼相机伴侣</string>
+    <string name="runtime_notification_channel_name">相机定位与保活服务</string>
+    <string name="runtime_notification_channel_description">保持后台向索尼微单持续发送 GPS 坐标，防止相机休眠断连</string>
+    <plurals name="runtime_photos_loaded">
+        <item quantity="other">已载入 %1$d 张机内照片</item>
+    </plurals>
+</resources>

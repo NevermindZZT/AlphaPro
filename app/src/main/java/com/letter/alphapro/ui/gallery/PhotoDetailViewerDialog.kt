@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -33,6 +35,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.letter.alphapro.core.ptp.CameraCaptureGroup
+import com.letter.alphapro.R
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import kotlin.math.min
 
 /** A full-size Activity-root destination, never a Dialog or nested Scaffold. */
@@ -45,6 +51,11 @@ fun PhotoDetailViewerScreen(
     onDismissRequest: () -> Unit,
     onDownloadClick: (CameraCaptureGroup) -> Unit
 ) {
+    val paneLabel = stringResource(R.string.gallery_viewer_title)
+    val locale = LocalConfiguration.current.locales[0]
+    val dateFormatter = remember(locale) { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale) }
+    val captureDate = group.captureDate.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it).format(dateFormatter) }
+    val sizeLabel = gallerySizeLabel(group.totalSizeMb)
     val handle = group.visualFile.handle
     val current = preview.takeIf { it.handle == handle }
     val large = current?.bitmap
@@ -55,7 +66,7 @@ fun PhotoDetailViewerScreen(
 
     Box(
         Modifier.fillMaxSize().background(Color.Black)
-            .semantics { paneTitle = "照片查看器" }
+            .semantics { paneTitle = paneLabel }
             .pointerInput(Unit) {
                 // Standard nested gesture handling: block background taps without consuming
                 // motion events that belong to child buttons or the pinch/drag viewport.
@@ -73,11 +84,11 @@ fun PhotoDetailViewerScreen(
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (scale > 1f) {
                         AlphaIconButton(onClick = { scale = 1f; offset = Offset.Zero }) {
-                            Icon(Icons.Rounded.ZoomOutMap, "还原缩放", tint = Color.White)
+                            Icon(Icons.Rounded.ZoomOutMap, stringResource(R.string.gallery_reset_zoom), tint = Color.White)
                         }
                     }
                     AlphaIconButton(onClick = onDismissRequest) {
-                        Icon(Icons.Rounded.Close, "关闭", tint = Color.White)
+                        Icon(Icons.Rounded.Close, stringResource(R.string.gallery_close), tint = Color.White)
                     }
                 }
                 val fit = if (bitmap != null && viewport.width > 0 && viewport.height > 0) {
@@ -102,12 +113,12 @@ fun PhotoDetailViewerScreen(
                         }
                     }, contentAlignment = Alignment.Center) {
                     if (bitmap != null) {
-                        Image(remember(bitmap) { bitmap.asImageBitmap() }, group.baseName,
+                        Image(remember(bitmap) { bitmap.asImageBitmap() }, stringResource(R.string.gallery_photo_description, group.baseName),
                             Modifier.fillMaxSize().graphicsLayer {
                                 scaleX = scale; scaleY = scale
                                 translationX = visibleOffset.x; translationY = visibleOffset.y
                             }, contentScale = ContentScale.Fit)
-                    } else Text(if (current?.isLoading == true) "正在获取预览…" else "暂无可用预览",
+                    } else Text(stringResource(if (current?.isLoading == true) R.string.gallery_fetching_preview else R.string.gallery_no_preview),
                         color = Color.White.copy(alpha = 0.75f))
                 }
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -116,31 +127,31 @@ fun PhotoDetailViewerScreen(
                     Column(Modifier.fillMaxWidth().heightIn(max = metadataLimit)
                         .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(when {
-                            large != null -> current?.sourceLabel ?: "相机预览 · "+large.width+" × "+large.height
-                            thumbnail != null -> "低分辨率缩略图 · "+thumbnail.width+" × "+thumbnail.height
-                            else -> "尚未加载预览"
+                            large != null -> current?.sourceLabel?.asString() ?: stringResource(R.string.gallery_camera_preview_dimensions, large.width, large.height)
+                            thumbnail != null -> stringResource(R.string.gallery_thumbnail_dimensions, thumbnail.width, thumbnail.height)
+                            else -> stringResource(R.string.gallery_preview_not_loaded)
                         }, color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
                         if (current?.isLoading == true) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
-                                Text("正在载入…", Modifier.padding(start = 8.dp), color = Color.White,
+                                Text(stringResource(R.string.gallery_loading), Modifier.padding(start = 8.dp), color = Color.White,
                                     style = MaterialTheme.typography.bodySmall)
                             }
                         }
                         if (current?.error != null || (current?.isLoading != true && large == null)) {
-                            Text(current?.error ?: "相机预览不可用", color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall)
+                            Text(current?.error?.asString() ?: stringResource(R.string.gallery_preview_unavailable), color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall)
                             AlphaTextButton(onClick = onRetry, enabled = current?.isLoading != true,
-                                colors = ButtonDefaults.textButtonColors(contentColor = Color.White, disabledContentColor = Color.White.copy(alpha = 0.38f))) { Text("重试预览") }
+                                colors = ButtonDefaults.textButtonColors(contentColor = Color.White, disabledContentColor = Color.White.copy(alpha = 0.38f))) { Text(stringResource(R.string.gallery_retry_preview)) }
                         }
-                        Text(group.badgeLabel + group.captureDate.takeIf { it.isNotBlank() }?.let { " · "+it }.orEmpty(),
+                        Text(if (captureDate != null) stringResource(R.string.gallery_format_date, group.badgeLabel, captureDate) else group.badgeLabel,
                             color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall)
-                        Text((if (group.isDualFormat) "双格式总大小: " else "大小: ")+String.format("%.1f MB", group.totalSizeMb),
+                        Text(stringResource(if (group.isDualFormat) R.string.gallery_dual_size else R.string.gallery_size, sizeLabel),
                             color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
                     }
                     AlphaButton(onClick = { onDownloadClick(group) }, Modifier.fillMaxWidth(), size = AlphaButtonSize.Large) {
                         Icon(Icons.Rounded.Download, null, Modifier.size(AlphaButtonDefaults.IconSize))
                         Spacer(Modifier.width(8.dp))
-                        Text(if (group.isDualFormat) "下载 / 导出" else "导出照片")
+                        Text(stringResource(if (group.isDualFormat) R.string.gallery_download_export else R.string.gallery_export_photo))
                     }
                 }
             }

@@ -1,6 +1,8 @@
 package com.letter.alphapro.ui.gallery
 
 import android.graphics.Bitmap
+import com.letter.alphapro.R
+import com.letter.alphapro.ui.components.LocalizedText
 import android.util.LruCache
 import com.letter.alphapro.core.ptp.PtpImageMetadata
 import com.letter.alphapro.core.ptp.PtpIpClient
@@ -25,12 +27,13 @@ class CameraPhotoLoader(private val client: PtpIpClient, private val scope: Coro
     private val sourceOrientations = ConcurrentHashMap<Long, Int>()
     private val _thumbnails = MutableStateFlow<Map<Long, Bitmap>>(emptyMap())
     val thumbnails = _thumbnails.asStateFlow()
-    private val _thumbnailErrors = MutableStateFlow<Map<Long, String>>(emptyMap())
+    private val _thumbnailErrors = MutableStateFlow<Map<Long, LocalizedText>>(emptyMap())
     val thumbnailErrors = _thumbnailErrors.asStateFlow()
     private val _preview = MutableStateFlow(PhotoPreviewState())
     val preview = _preview.asStateFlow()
     private var previewJob: Job? = null
     private var generation = 0
+    private class DisplayException(val text: LocalizedText) : IllegalStateException("Camera preview unavailable")
 
     /** Retry at most one idempotent read after transport recovery, never a capture or write. */
     private suspend fun <T> readWithRecovery(read: suspend () -> T): T {
@@ -61,11 +64,11 @@ class CameraPhotoLoader(private val client: PtpIpClient, private val scope: Coro
                             if (!metadata.isContentCatalog) throw large
                             // A drained oversized thumbnail may still have a usable rendered preview.
                             readWithRecovery { client.getPreview(metadata) }
-                        } ?: error("相机未返回缩略图数据")
+                        } ?: throw DisplayException(LocalizedText(R.string.preview_no_thumbnail))
                         currentCoroutineContext().ensureActive()
                         val fallback = if (CameraBitmapDecoder.orientation(bytes) == null) sourceOrientation(metadata) else null
                         currentCoroutineContext().ensureActive()
-                        checkNotNull(CameraBitmapDecoder.decode(bytes, 512, fallback)) { "缩略图解码失败" }
+                        CameraBitmapDecoder.decode(bytes, 512, fallback) ?: throw DisplayException(LocalizedText(R.string.preview_thumbnail_decode))
                     }
                 }
                 if (generation == epoch) {
@@ -102,7 +105,7 @@ class CameraPhotoLoader(private val client: PtpIpClient, private val scope: Coro
         previewJob = scope.launch {
             try {
                 val loaded = withContext(Dispatchers.IO) {
-                    var source = "相机大预览"
+                    var source = R.string.preview_camera_source
                     var bytes: ByteArray? = null
                     if (metadata.isContentCatalog) {
                         try { bytes = readWithRecovery { client.getPreview(metadata) } }
@@ -113,16 +116,16 @@ class CameraPhotoLoader(private val client: PtpIpClient, private val scope: Coro
                     var fallback = bytes?.takeIf { CameraBitmapDecoder.orientation(it) == null }?.let { sourceOrientation(metadata) }
                     var bitmap = bytes?.let { CameraBitmapDecoder.decode(it, 3072, fallback) }
                     if (bitmap == null || maxOf(bitmap.width, bitmap.height) <= 512) {
-                        check(!metadata.isRaw) { "相机未提供 RAW 大预览；不会自动下载完整 RAW" }
-                        source = "渲染原片预览（仅临时读取）"
+                        if (metadata.isRaw) throw DisplayException(LocalizedText(R.string.preview_raw_unavailable))
+                        source = R.string.preview_original_source
                         bytes = readRenderedOriginal(metadata)
                         currentCoroutineContext().ensureActive()
                         fallback = if (CameraBitmapDecoder.orientation(bytes) == null) sourceOrientation(metadata) else null
                         bitmap = CameraBitmapDecoder.decode(bytes, 3072, fallback)
                     }
-                    val image = checkNotNull(bitmap) { "手机暂不能解码该预览，请尝试导出原片" }
-                    check(maxOf(image.width, image.height) > 512) { "相机仅返回低分辨率图像" }
-                    image to (source+" · "+image.width+" × "+image.height)
+                    val image = bitmap ?: throw DisplayException(LocalizedText(R.string.preview_decode_unavailable))
+                    if (maxOf(image.width, image.height) <= 512) throw DisplayException(LocalizedText(R.string.preview_low_resolution))
+                    image to LocalizedText(source, listOf(image.width, image.height))
                 }
                 if (generation == epoch) _preview.value = PhotoPreviewState(metadata.handle, loaded.first, sourceLabel = loaded.second)
             } catch (cancelled: CancellationException) { throw cancelled }
@@ -132,10 +135,11 @@ class CameraPhotoLoader(private val client: PtpIpClient, private val scope: Coro
         }
     }
 
-    private fun errorText(failure: Exception): String = when (failure) {
-        is PtpDataException -> "该照片返回的数据不完整或超出预览限制，可重试其他照片"
-        is PtpResponseException -> "相机拒绝该照片读取：" + failure.message
-        else -> "预览读取失败：" + (failure.cause?.message ?: failure.message ?: failure.javaClass.simpleName)
+    private fun errorText(failure: Exception): LocalizedText = when (failure) {
+        is DisplayException -> failure.text
+        is PtpDataException -> LocalizedText(R.string.preview_bad_data)
+        is PtpResponseException -> LocalizedText(R.string.preview_refused, listOf(failure.message.orEmpty()))
+        else -> LocalizedText(R.string.preview_failed, listOf(failure.cause?.message ?: failure.message ?: failure.javaClass.simpleName))
     }
 
     private suspend fun sourceOrientation(metadata: PtpImageMetadata): Int? {
@@ -152,14 +156,14 @@ class CameraPhotoLoader(private val client: PtpIpClient, private val scope: Coro
     }
 
     private suspend fun readRenderedOriginal(metadata: PtpImageMetadata): ByteArray {
-        check(!metadata.isRaw && metadata.fileSize in 1..32 * 1024 * 1024L) { "未提供大预览，或原片超出安全预览大小；请手动导出" }
+        if (metadata.isRaw || metadata.fileSize !in 1..32 * 1024 * 1024L) throw DisplayException(LocalizedText(R.string.preview_original_limit))
         val stream = ByteArrayOutputStream()
         var offset = 0L
         while (offset < metadata.fileSize) {
             currentCoroutineContext().ensureActive()
             val length = minOf(512 * 1024L, metadata.fileSize - offset).toInt()
             val chunk = readWithRecovery { client.readPartialObject(metadata, offset, length) }
-            check(chunk.size == length) { "原片预览数据不完整" }
+            if (chunk.size != length) throw DisplayException(LocalizedText(R.string.preview_original_incomplete))
             stream.write(chunk); offset += chunk.size
         }
         return stream.toByteArray()

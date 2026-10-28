@@ -1,7 +1,7 @@
 package com.letter.alphapro.ui.settings
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -12,9 +12,14 @@ import com.letter.alphapro.data.AppThemeMode
 import com.letter.alphapro.ui.theme.AlphaProTheme
 import com.letter.alphapro.viewmodel.CameraViewModel
 
-class SettingsActivity : ComponentActivity() {
+class SettingsActivity : AppCompatActivity() {
 
     private val viewModel: CameraViewModel by viewModels()
+
+    override fun attachBaseContext(newBase: android.content.Context) {
+        com.letter.alphapro.data.AppLanguage.initialize(newBase)
+        super.attachBaseContext(newBase)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()

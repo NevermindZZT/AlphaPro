@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="preview_no_thumbnail">相机未返回缩略图数据。</string>
+    <string name="preview_thumbnail_decode">缩略图解码失败。</string>
+    <string name="preview_camera_source">相机大预览 · %1$d × %2$d</string>
+    <string name="preview_original_source">渲染原片预览（仅临时读取） · %1$d × %2$d</string>
+    <string name="preview_raw_unavailable">相机未提供 RAW 大预览；不会自动下载完整 RAW。</string>
+    <string name="preview_decode_unavailable">手机暂不能解码该预览，请尝试导出原片。</string>
+    <string name="preview_low_resolution">相机仅返回低分辨率图像。</string>
+    <string name="preview_bad_data">该照片返回的数据不完整或超出预览限制，可重试或查看其他照片。</string>
+    <string name="preview_refused">相机拒绝该照片读取：%1$s</string>
+    <string name="preview_failed">预览读取失败：%1$s</string>
+    <string name="preview_original_limit">未提供大预览，或原片超出安全预览大小；请手动导出。</string>
+    <string name="preview_original_incomplete">原片预览数据不完整。</string>
+</resources>

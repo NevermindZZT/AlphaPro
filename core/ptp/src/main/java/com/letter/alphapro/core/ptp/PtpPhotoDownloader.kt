@@ -117,7 +117,7 @@ class PtpPhotoDownloader(
             val length = minOf(CHUNK_SIZE.toLong(), total - offset).toInt()
             val chunk = client.readPartialObject(metadata, offset, length)
             if (chunk.isEmpty()) {
-                throw java.io.IOException("PTP 数据分块传输中断: 读取返回 0 字节 (offset=$offset, total=$total)")
+                throw java.io.IOException("PTP data transfer interrupted: empty chunk (offset=$offset, total=$total)")
             }
             outputStream.write(chunk)
             offset += chunk.size

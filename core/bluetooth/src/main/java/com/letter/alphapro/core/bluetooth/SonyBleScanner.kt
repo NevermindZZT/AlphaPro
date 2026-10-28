@@ -24,7 +24,7 @@ data class DiscoveredCamera(
 )
 
 @SuppressLint("MissingPermission")
-class SonyBleScanner(private val context: Context) {
+class SonyBleScanner(private val context: Context, private val messageContext: () -> Context = { context }) {
     private val bluetoothAdapter: BluetoothAdapter? by lazy {
         val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
         manager?.adapter
@@ -88,7 +88,8 @@ class SonyBleScanner(private val context: Context) {
                 val isNewDevice = !discoveredMap.containsKey(address)
                 val existing = discoveredMap[address]
 
-                val displayName = name ?: if (isSony) "Sony Camera (${address.takeLast(5)})" else "蓝牙设备 (${address.takeLast(5)})"
+                val displayName = name ?: messageContext().getString(
+                    if (isSony) R.string.ble_camera_fallback else R.string.ble_device_fallback, address.takeLast(5))
 
                 discoveredMap[address] = DiscoveredCamera(
                     device = device,

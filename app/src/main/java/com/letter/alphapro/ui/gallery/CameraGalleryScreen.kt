@@ -18,6 +18,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -29,6 +32,10 @@ import com.letter.alphapro.core.ptp.CameraCaptureGroup
 import com.letter.alphapro.core.ptp.CameraPhotoDate
 import com.letter.alphapro.core.ptp.toCaptureGroups
 import com.letter.alphapro.core.ptp.toDateSections
+import com.letter.alphapro.R
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import com.letter.alphapro.viewmodel.CameraViewModel
 import com.letter.alphapro.wifi.CameraWifiState
 
@@ -49,6 +56,8 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
     val groups = remember(state.mediaItems) { state.mediaItems.toCaptureGroups() }
     val filtered = remember(groups, filter) { groups.filter { filter == 0 || (filter == 1 && it.hasHeif) || (filter == 2 && it.hasRaw) } }
     val sections = remember(filtered) { filtered.toDateSections() }
+    val locale = LocalConfiguration.current.locales[0]
+    val dateFormatter = remember(locale) { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale) }
 
     Scaffold(
         modifier = modifier,
@@ -56,16 +65,17 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
         topBar = {
             TopAppBar(title = {
                 Column {
-                    Text("相机存储卡浏览", maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    Text(stringResource(R.string.gallery_title), maxLines = 1, overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(if (connected) "已载入 "+groups.size+" 组照片（"+state.mediaItems.size+" 个文件）" else "Wi-Fi 未连接",
+                    Text(if (connected) pluralStringResource(R.plurals.gallery_loaded_groups, groups.size, groups.size,
+                        pluralStringResource(R.plurals.gallery_file_count, state.mediaItems.size, state.mediaItems.size)) else stringResource(R.string.gallery_wifi_disconnected),
                         maxLines = 2, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }, actions = {
                 if (connected) {
-                    AlphaIconButton(onClick = { viewModel.loadCameraMedia() }, enabled = !state.isMediaLoading) { Icon(Icons.Rounded.Refresh, "刷新") }
+                    AlphaIconButton(onClick = { viewModel.loadCameraMedia() }, enabled = !state.isMediaLoading) { Icon(Icons.Rounded.Refresh, stringResource(R.string.gallery_refresh)) }
                     AlphaIconButton(onClick = { selecting = !selecting; if (!selecting) selected.clear() }) {
-                        Icon(if (selecting) Icons.Rounded.Close else Icons.Rounded.Checklist, "多选")
+                        Icon(if (selecting) Icons.Rounded.Close else Icons.Rounded.Checklist, stringResource(if (selecting) R.string.gallery_exit_selection else R.string.gallery_select_multiple))
                     }
                 }
             })
@@ -74,13 +84,13 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
             if (selecting && selected.isNotEmpty()) {
                 Surface(tonalElevation = 6.dp) {
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("已选择 "+selected.size+" 组照片", style = MaterialTheme.typography.titleSmall)
+                        Text(pluralStringResource(R.plurals.gallery_selected_groups, selected.size, selected.size), style = MaterialTheme.typography.titleSmall)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             AlphaOutlinedButton(onClick = {
                                 groups.filter { it.id in selected }.flatMap { it.files }.forEach { viewModel.exportPhoto(it, false) }
                                 selected.clear(); selecting = false
-                            }, modifier = Modifier.weight(1f)) { Text("原图直出") }
-                            AlphaButton(onClick = { exportSheet = true }, modifier = Modifier.weight(1f)) { Text("智能导出") }
+                            }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.gallery_export_originals)) }
+                            AlphaButton(onClick = { exportSheet = true }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.gallery_smart_export)) }
                         }
                     }
                 }
@@ -92,7 +102,11 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
                 // Filters are outside the filtered-content branch, including zero-result/loading states.
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val labels = listOf("全部 ("+groups.size+")", "HEIF ("+groups.count { it.hasHeif }+")", "RAW ("+groups.count { it.hasRaw }+")")
+                    val labels = listOf(
+                        stringResource(R.string.gallery_filter_all, groups.size),
+                        stringResource(R.string.gallery_filter_heif, groups.count { it.hasHeif }),
+                        stringResource(R.string.gallery_filter_raw, groups.count { it.hasRaw })
+                    )
                     labels.forEachIndexed { index, label ->
                         AlphaFilterChip(selected = filter == index, onClick = { filter = index },
                             label = { Text(label, maxLines = 1, softWrap = false) })
@@ -103,10 +117,10 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
                 !connected -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         Icon(Icons.Rounded.WifiOff, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
-                        Text("尚未连接相机 Wi-Fi", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.gallery_camera_wifi_not_connected), style = MaterialTheme.typography.titleMedium)
                         AlphaButton(onClick = viewModel::connectCameraWifi, size = AlphaButtonSize.Large,
                             enabled = !connecting && state.bleState is SonyBleConnectionState.Ready) {
-                            Text(if (connecting) "正在连接…" else "一键直连相机 Wi-Fi")
+                            Text(stringResource(if (connecting) R.string.gallery_connecting else R.string.gallery_connect_wifi))
                         }
                     }
                 }
@@ -114,8 +128,8 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
                 filtered.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Rounded.PhotoLibrary, null, Modifier.size(40.dp))
-                        Text(if (groups.isEmpty()) "存储卡内暂无照片" else "没有符合当前筛选的照片")
-                        if (filter != 0) AlphaTextButton(onClick = { filter = 0 }) { Text("显示全部照片") }
+                        Text(stringResource(if (groups.isEmpty()) R.string.gallery_empty_card else R.string.gallery_empty_filter))
+                        if (filter != 0) AlphaTextButton(onClick = { filter = 0 }) { Text(stringResource(R.string.gallery_show_all)) }
                     }
                 }
                 else -> LazyVerticalGrid(columns = GridCells.Fixed(3), state = grid,
@@ -129,18 +143,19 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
                                     collapsedDates = if (collapsed) collapsedDates - section.key else collapsedDates + section.key
                                 }) {
                                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text(if (section.key == CameraPhotoDate.UNKNOWN_KEY) "日期未知" else section.title,
+                                    Text(if (section.key == CameraPhotoDate.UNKNOWN_KEY) stringResource(R.string.gallery_unknown_date)
+                                        else LocalDate.parse(section.key).format(dateFormatter),
                                         Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                                    Text(section.captures.size.toString()+" 张", style = MaterialTheme.typography.labelMedium)
+                                    Text(pluralStringResource(R.plurals.gallery_photo_count, section.captures.size, section.captures.size), style = MaterialTheme.typography.labelMedium)
                                     Spacer(Modifier.width(8.dp))
                                     Icon(if (collapsed) Icons.Rounded.ExpandMore else Icons.Rounded.ExpandLess,
-                                        if (collapsed) "展开日期分组" else "折叠日期分组")
+                                        stringResource(if (collapsed) R.string.gallery_expand_date else R.string.gallery_collapse_date))
                                 }
                             }
                         }
                         if (!collapsed) items(section.captures, key = { it.id }) { group ->
                             val file = group.visualFile
-                            PhotoGroupGridCell(group, thumbnails[file.handle], errors[file.handle], selecting,
+                            PhotoGroupGridCell(group, thumbnails[file.handle], errors[file.handle]?.asString(), selecting,
                                 group.id in selected, state.downloadProgressMap[file.filename],
                                 onRequest = { viewModel.requestThumbnail(file) },
                                 onRelease = { viewModel.releaseThumbnailRequest(file.handle) },
@@ -177,12 +192,12 @@ private fun PhotoGroupGridCell(
     Surface(Modifier.aspectRatio(1f).clickable(onClick = onClick), shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Box(Modifier.fillMaxSize()) {
-            if (thumbnail != null) Image(thumbnail.asImageBitmap(), group.baseName, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            if (thumbnail != null) Image(thumbnail.asImageBitmap(), stringResource(R.string.gallery_photo_description, group.baseName), Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             else Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (error == null) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                 else {
                     Icon(Icons.Rounded.BrokenImage, error, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.outline)
-                    AlphaTextButton(onClick = onRetry) { Text("重试缩略图", style = MaterialTheme.typography.labelLarge) }
+                    AlphaTextButton(onClick = onRetry) { Text(stringResource(R.string.gallery_retry_thumbnail), style = MaterialTheme.typography.labelLarge) }
                 }
             }
             if (!selecting) Surface(Modifier.align(Alignment.TopStart).padding(6.dp), shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primary) {
@@ -190,7 +205,7 @@ private fun PhotoGroupGridCell(
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), maxLines = 1)
             }
             if (selecting) AlphaFilledIconButton(onClick, Modifier.align(Alignment.TopEnd).padding(4.dp)) {
-                Icon(if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked, "选择照片", Modifier.size(AlphaButtonDefaults.IconSize))
+                Icon(if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked, stringResource(if (selected) R.string.gallery_deselect_photo else R.string.gallery_select_photo, group.baseName), Modifier.size(AlphaButtonDefaults.IconSize))
             }
             Surface(Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = Color.Black.copy(alpha = 0.55f)) {
                 Text(group.baseName, Modifier.padding(horizontal = 6.dp, vertical = 3.dp), color = Color.White,

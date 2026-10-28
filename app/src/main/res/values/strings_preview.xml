@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="preview_no_thumbnail">The camera returned no thumbnail data.</string>
+    <string name="preview_thumbnail_decode">Unable to decode the thumbnail.</string>
+    <string name="preview_camera_source">Camera preview · %1$d × %2$d</string>
+    <string name="preview_original_source">Rendered original preview (temporary) · %1$d × %2$d</string>
+    <string name="preview_raw_unavailable">The camera did not provide a RAW preview. Full RAW files are not downloaded automatically.</string>
+    <string name="preview_decode_unavailable">This device cannot decode the preview. Try exporting the original file.</string>
+    <string name="preview_low_resolution">The camera returned only a low-resolution image.</string>
+    <string name="preview_bad_data">This photo returned incomplete or oversized data. You can retry or open another photo.</string>
+    <string name="preview_refused">The camera refused this photo read: %1$s</string>
+    <string name="preview_failed">Unable to load preview: %1$s</string>
+    <string name="preview_original_limit">A large preview is unavailable, or the original exceeds the safe preview limit. Please export it manually.</string>
+    <string name="preview_original_incomplete">The original preview data is incomplete.</string>
+</resources>
