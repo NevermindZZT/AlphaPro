@@ -1,5 +1,6 @@
 package com.letter.alphapro.ui.gallery
 
+import com.letter.alphapro.ui.components.*
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -71,11 +72,11 @@ fun PhotoDetailViewerScreen(
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (scale > 1f) {
-                        IconButton(onClick = { scale = 1f; offset = Offset.Zero }) {
+                        AlphaIconButton(onClick = { scale = 1f; offset = Offset.Zero }) {
                             Icon(Icons.Rounded.ZoomOutMap, "还原缩放", tint = Color.White)
                         }
                     }
-                    IconButton(onClick = onDismissRequest) {
+                    AlphaIconButton(onClick = onDismissRequest) {
                         Icon(Icons.Rounded.Close, "关闭", tint = Color.White)
                     }
                 }
@@ -128,16 +129,16 @@ fun PhotoDetailViewerScreen(
                         }
                         if (current?.error != null || (current?.isLoading != true && large == null)) {
                             Text(current?.error ?: "相机预览不可用", color = Color(0xFFFFB4AB), style = MaterialTheme.typography.bodySmall)
-                            TextButton(onClick = onRetry, enabled = current?.isLoading != true) { Text("重试预览", color = Color.White) }
+                            AlphaTextButton(onClick = onRetry, enabled = current?.isLoading != true,
+                                colors = ButtonDefaults.textButtonColors(contentColor = Color.White, disabledContentColor = Color.White.copy(alpha = 0.38f))) { Text("重试预览") }
                         }
                         Text(group.badgeLabel + group.captureDate.takeIf { it.isNotBlank() }?.let { " · "+it }.orEmpty(),
                             color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall)
                         Text((if (group.isDualFormat) "双格式总大小: " else "大小: ")+String.format("%.1f MB", group.totalSizeMb),
                             color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
                     }
-                    Button(onClick = { onDownloadClick(group) }, Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                        shape = RoundedCornerShape(12.dp)) {
-                        Icon(Icons.Rounded.Download, null, Modifier.size(18.dp))
+                    AlphaButton(onClick = { onDownloadClick(group) }, Modifier.fillMaxWidth(), size = AlphaButtonSize.Large) {
+                        Icon(Icons.Rounded.Download, null, Modifier.size(AlphaButtonDefaults.IconSize))
                         Spacer(Modifier.width(8.dp))
                         Text(if (group.isDualFormat) "下载 / 导出" else "导出照片")
                     }

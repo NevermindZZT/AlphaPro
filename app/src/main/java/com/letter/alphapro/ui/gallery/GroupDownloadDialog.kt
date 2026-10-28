@@ -1,5 +1,6 @@
 package com.letter.alphapro.ui.gallery
 
+import com.letter.alphapro.ui.components.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -131,14 +132,14 @@ fun GroupDownloadDialog(
             }
         },
         confirmButton = {
-            Button(
+            AlphaButton(
                 onClick = { onConfirmDownload(selectedTarget, transcodeHeif) }
             ) {
                 Text("开始下载")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismissRequest) {
+            AlphaTextButton(onClick = onDismissRequest) {
                 Text("取消")
             }
         }

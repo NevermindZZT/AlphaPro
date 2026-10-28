@@ -9,7 +9,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -32,11 +31,11 @@ fun WifiDiagnosticDialog(diagnostic: String, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(onClick = {
+            AlphaTextButton(onClick = {
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 clipboard.setPrimaryClip(ClipData.newPlainText("AlphaPro Wi-Fi 诊断", diagnostic))
             }) { Text("复制诊断") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("关闭") } }
+        dismissButton = { AlphaTextButton(onClick = onDismiss) { Text("关闭") } }
     )
 }

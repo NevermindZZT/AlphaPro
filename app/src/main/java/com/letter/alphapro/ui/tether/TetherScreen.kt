@@ -1,5 +1,6 @@
 package com.letter.alphapro.ui.tether
 
+import com.letter.alphapro.ui.components.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -136,7 +137,7 @@ fun TetherScreen(
                             color = Color.Black.copy(alpha = 0.6f)
                         ) {
                             Row(modifier = Modifier.padding(4.dp)) {
-                                IconButton(onClick = { isLutActive = !isLutActive }) {
+                                AlphaIconButton(onClick = { isLutActive = !isLutActive }) {
                                     Icon(
                                         imageVector = Icons.Rounded.ColorLens,
                                         contentDescription = "LUT",

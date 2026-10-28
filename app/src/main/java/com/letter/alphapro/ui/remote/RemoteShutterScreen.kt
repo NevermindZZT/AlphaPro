@@ -1,9 +1,6 @@
 package com.letter.alphapro.ui.remote
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -16,15 +13,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.letter.alphapro.core.bluetooth.SonyBleConnectionState
+import com.letter.alphapro.ui.components.AlphaButton
+import com.letter.alphapro.ui.components.AlphaButtonDefaults
+import com.letter.alphapro.ui.components.AlphaSegmentedButton
+import com.letter.alphapro.ui.components.AlphaShutterButton
+import com.letter.alphapro.ui.components.AlphaSingleChoiceSegmentedButtonRow
+import com.letter.alphapro.ui.components.AlphaTonalButton
 import com.letter.alphapro.ui.theme.CameraActiveGreen
-import com.letter.alphapro.ui.theme.CameraRecordingRed
 import com.letter.alphapro.viewmodel.CameraViewModel
 
 enum class RemoteShootingMode(val label: String) {
@@ -34,7 +33,7 @@ enum class RemoteShootingMode(val label: String) {
     INTERVAL("延时摄影")
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun RemoteShutterScreen(
     viewModel: CameraViewModel,
@@ -117,7 +116,7 @@ fun RemoteShutterScreen(
                         imageVector = Icons.Rounded.Info,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(AlphaButtonDefaults.IconSize)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
@@ -129,14 +128,15 @@ fun RemoteShutterScreen(
             }
 
             // Mode Selector
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            AlphaSingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 RemoteShootingMode.entries.forEachIndexed { index, mode ->
-                    SegmentedButton(
+                    AlphaSegmentedButton(
                         selected = selectedMode == mode,
                         onClick = { selectedMode = mode },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = RemoteShootingMode.entries.size)
+                        index = index,
+                        count = RemoteShootingMode.entries.size
                     ) {
-                        Text(text = mode.label, style = MaterialTheme.typography.labelMedium)
+                        Text(text = mode.label)
                     }
                 }
             }
@@ -152,74 +152,60 @@ fun RemoteShutterScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    // Tactile Shutter Button with gesture detection
-                    Box(
-                        modifier = Modifier
-                            .size(160.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                            .border(
-                                6.dp,
-                                if (isBleReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                                CircleShape
-                            )
-                            .clickable(enabled = isBleReady) {
-                                viewModel.takePhoto()
-                            },
-                        contentAlignment = Alignment.Center
+                    // Shared shutter styling; keep a single photo callback.
+                    AlphaShutterButton(
+                        onClick = { viewModel.takePhoto() },
+                        enabled = isBleReady
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
                                 imageVector = Icons.Rounded.Camera,
                                 contentDescription = null,
                                 modifier = Modifier.size(54.dp),
-                                tint = if (isBleReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                tint = LocalContentColor.current
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = if (!isBleReady) "请先连接相机" else "按下拍照",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurface
+                                style = MaterialTheme.typography.labelLarge
                             )
                         }
                     }
 
                     // Secondary Controls: AF Lock & Video REC
-                    Row(
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        FilledTonalButton(
+                        AlphaTonalButton(
                             onClick = {
                                 isAfPressed = !isAfPressed
                                 if (isAfPressed) viewModel.halfPressAfDown() else viewModel.halfPressAfUp()
                             },
-                            enabled = isBleReady,
-                            modifier = Modifier.height(48.dp),
-                            shape = RoundedCornerShape(14.dp)
+                            enabled = isBleReady
                         ) {
-                            Icon(Icons.Rounded.CenterFocusStrong, contentDescription = null)
+                            Icon(Icons.Rounded.CenterFocusStrong, contentDescription = null, modifier = Modifier.size(AlphaButtonDefaults.IconSize))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(if (isAfPressed) "AF 锁定中" else "半按 AF")
                         }
 
-                        Button(
+                        AlphaButton(
                             onClick = {
                                 isRecordingVideo = !isRecordingVideo
                                 viewModel.toggleMovieRecording()
                             },
                             enabled = isBleReady,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isRecordingVideo) CameraRecordingRed else MaterialTheme.colorScheme.surfaceContainerHighest,
-                                contentColor = if (isRecordingVideo) Color.White else MaterialTheme.colorScheme.onSurface
-                            ),
-                            modifier = Modifier.height(48.dp),
-                            shape = RoundedCornerShape(14.dp)
+                                containerColor = if (isRecordingVideo) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                contentColor = if (isRecordingVideo) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurface
+                            )
                         ) {
                             Icon(
                                 imageVector = if (isRecordingVideo) Icons.Rounded.Stop else Icons.Rounded.FiberManualRecord,
                                 contentDescription = null,
-                                tint = if (isRecordingVideo) Color.White else CameraRecordingRed
+                                tint = if (!isBleReady) LocalContentColor.current else if (isRecordingVideo) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(AlphaButtonDefaults.IconSize)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(if (isRecordingVideo) "录像中 (REC)" else "录像开关")
@@ -252,10 +238,11 @@ fun RemoteShutterScreen(
                                 )
                             }
                             Spacer(modifier = Modifier.height(12.dp))
-                            Button(
+                            AlphaButton(
                                 onClick = { viewModel.toggleBulb() },
                                 enabled = isBleReady,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = if (uiState.isBulbActive) AlphaButtonDefaults.destructiveColors() else ButtonDefaults.buttonColors()
                             ) {
                                 Text(if (uiState.isBulbActive) "结束长曝光" else "锁定开始长曝光")
                             }
@@ -286,7 +273,7 @@ fun RemoteShutterScreen(
                                     style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                 )
                             }
-                            Button(
+                            AlphaButton(
                                 onClick = { viewModel.startIntervalometer(intervalSeconds, totalIntervalShots) },
                                 enabled = isBleReady && uiState.activeIntervalRemaining == null,
                                 modifier = Modifier.fillMaxWidth()

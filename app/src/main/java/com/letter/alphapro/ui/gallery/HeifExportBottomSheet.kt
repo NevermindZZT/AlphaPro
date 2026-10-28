@@ -1,5 +1,6 @@
 package com.letter.alphapro.ui.gallery
 
+import com.letter.alphapro.ui.components.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -106,11 +107,11 @@ fun HeifExportBottomSheet(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedButton(
+                AlphaOutlinedButton(
                     onClick = onDismissRequest,
                     modifier = Modifier.weight(1f)
                 ) { Text("取消") }
-                Button(
+                AlphaButton(
                     onClick = { onStartExport(selectedMode, jpegQuality.toInt()) },
                     modifier = Modifier.weight(1f)
                 ) { Text("开始高速导出") }

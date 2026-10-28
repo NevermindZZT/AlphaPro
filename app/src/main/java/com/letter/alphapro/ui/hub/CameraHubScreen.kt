@@ -1,5 +1,6 @@
 package com.letter.alphapro.ui.hub
 
+import com.letter.alphapro.ui.components.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -57,13 +58,13 @@ fun CameraHubScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
+                    AlphaIconButton(onClick = {
                         showScanDialog = true
                         viewModel.startScan(sonyOnly = true)
                     }) {
                         Icon(Icons.Rounded.BluetoothSearching, contentDescription = "搜索配对相机")
                     }
-                    IconButton(onClick = {
+                    AlphaIconButton(onClick = {
                         val intent = android.content.Intent(context, com.letter.alphapro.ui.settings.SettingsActivity::class.java)
                         context.startActivity(intent)
                     }) {
@@ -191,7 +192,7 @@ private fun DynamicCameraHeroCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                     val statusColor = when (bleState) {
                         is SonyBleConnectionState.Ready -> CameraActiveGreen
                         is SonyBleConnectionState.Pairing, is SonyBleConnectionState.Connecting, is SonyBleConnectionState.Handshaking -> CameraWarningAmber
@@ -215,6 +216,8 @@ private fun DynamicCameraHeroCard(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = statusText,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -232,38 +235,38 @@ private fun DynamicCameraHeroCard(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         if (isConnected) {
-                            OutlinedButton(
+                            AlphaOutlinedButton(
                                 onClick = onDisconnect,
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                                modifier = Modifier.height(30.dp)
+                                modifier = Modifier,
+                                size = AlphaButtonSize.Compact
                             ) {
-                                Text("断开连接", style = MaterialTheme.typography.labelSmall)
+                                Text("断开连接")
                             }
                         } else if (!isConnecting) {
-                            Button(
+                            AlphaButton(
                                 onClick = onReconnect,
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                                modifier = Modifier.height(30.dp)
+                                modifier = Modifier,
+                                size = AlphaButtonSize.Compact
                             ) {
-                                Icon(Icons.Rounded.BluetoothConnected, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("重新连接", style = MaterialTheme.typography.labelSmall)
+                                Icon(Icons.Rounded.BluetoothConnected, contentDescription = null, modifier = Modifier.size(AlphaButtonSize.Compact.iconSize))
+                                Spacer(modifier = Modifier.width(AlphaButtonSize.Compact.iconSpacing))
+                                Text("重新连接")
                             }
                         } else {
-                            OutlinedButton(
+                            AlphaOutlinedButton(
                                 onClick = onDisconnect,
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                                modifier = Modifier.height(30.dp)
+                                modifier = Modifier,
+                                size = AlphaButtonSize.Compact
                             ) {
-                                Text("取消", style = MaterialTheme.typography.labelSmall)
+                                Text("取消")
                             }
                         }
 
-                        IconButton(onClick = onForgetDevice, modifier = Modifier.size(30.dp)) {
+                        AlphaIconButton(onClick = onForgetDevice) {
                             Icon(
                                 imageVector = Icons.Rounded.DeleteOutline,
                                 contentDescription = "解除配对",
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(AlphaButtonDefaults.IconSize),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -301,12 +304,12 @@ private fun DynamicCameraHeroCard(
 
             if (pairedAddress == null) {
                 Spacer(modifier = Modifier.height(16.dp))
-                Button(
+                AlphaButton(
                     onClick = onPairNewDevice,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    size = AlphaButtonSize.Large
                 ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(AlphaButtonDefaults.IconSize))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("搜索并配对索尼相机")
                 }
@@ -425,20 +428,17 @@ private fun BentoWifiCard(
                     color = if (isConnected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                FilledTonalButton(
+                AlphaTonalButton(
                     onClick = if (isConnected) onDisconnect else onConnect,
                     enabled = !isConnecting && (isConnected || isBleConnected),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(32.dp),
-                    contentPadding = PaddingValues(0.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    size = AlphaButtonSize.Compact
                 ) {
                     if (isConnecting) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        AlphaButtonProgress(size = AlphaButtonSize.Compact)
                     } else {
                         Text(
-                            text = if (isConnected) "断开 Wi-Fi" else "一键秒连",
-                            style = MaterialTheme.typography.labelSmall
+                            text = if (isConnected) "断开 Wi-Fi" else "一键秒连"
                         )
                     }
                 }
@@ -477,11 +477,11 @@ private fun BentoTimeSyncCard(
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(26.dp)
                 )
-                IconButton(onClick = onSync, enabled = isBleConnected, modifier = Modifier.size(32.dp)) {
+                AlphaIconButton(onClick = onSync, enabled = isBleConnected) {
                     Icon(
                         imageVector = Icons.Rounded.Sync,
                         contentDescription = "同步",
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(AlphaButtonDefaults.IconSize)
                     )
                 }
             }

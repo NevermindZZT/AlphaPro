@@ -30,6 +30,13 @@ import androidx.compose.ui.unit.sp
 import com.letter.alphapro.data.AppThemeMode
 import com.letter.alphapro.data.DefaultHeifPolicy
 import com.letter.alphapro.data.GpsInterval
+import com.letter.alphapro.ui.components.AlphaButton
+import com.letter.alphapro.ui.components.AlphaButtonDefaults
+import com.letter.alphapro.ui.components.AlphaIconButton
+import com.letter.alphapro.ui.components.AlphaOutlinedButton
+import com.letter.alphapro.ui.components.AlphaSegmentedButton
+import com.letter.alphapro.ui.components.AlphaSingleChoiceSegmentedButtonRow
+import com.letter.alphapro.ui.components.AlphaTextButton
 import com.letter.alphapro.ui.theme.AlphaOrangePrimary
 import com.letter.alphapro.viewmodel.CameraViewModel
 
@@ -66,10 +73,11 @@ fun SettingsScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    AlphaIconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.Rounded.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = "返回",
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -109,17 +117,15 @@ fun SettingsScreen(
                         text = "主题显示模式",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                     )
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    AlphaSingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         AppThemeMode.entries.forEachIndexed { index, mode ->
-                            SegmentedButton(
+                            AlphaSegmentedButton(
                                 selected = themeMode == mode,
                                 onClick = { viewModel.setThemeMode(mode) },
-                                shape = SegmentedButtonDefaults.itemShape(
-                                    index = index,
-                                    count = AppThemeMode.entries.size
-                                )
+                                index = index,
+                                count = AppThemeMode.entries.size
                             ) {
-                                Text(mode.label, style = MaterialTheme.typography.labelSmall)
+                                Text(mode.label)
                             }
                         }
                     }
@@ -163,17 +169,15 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    AlphaSingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         GpsInterval.entries.forEachIndexed { index, interval ->
-                            SegmentedButton(
+                            AlphaSegmentedButton(
                                 selected = gpsInterval == interval,
                                 onClick = { viewModel.setGpsInterval(interval) },
-                                shape = SegmentedButtonDefaults.itemShape(
-                                    index = index,
-                                    count = GpsInterval.entries.size
-                                )
+                                index = index,
+                                count = GpsInterval.entries.size
                             ) {
-                                Text(interval.label, style = MaterialTheme.typography.labelSmall)
+                                Text(interval.label)
                             }
                         }
                     }
@@ -222,7 +226,7 @@ fun SettingsScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.End
                                 ) {
-                                    Button(
+                                    AlphaButton(
                                         onClick = {
                                             val gpxFile = viewModel.flushAndGetGpxFile()
                                             if (gpxFile != null && gpxFile.exists()) {
@@ -240,13 +244,11 @@ fun SettingsScreen(
                                                     context.startActivity(Intent.createChooser(shareIntent, "导出 / 分享 GPX 轨迹"))
                                                 } catch (_: Exception) {}
                                             }
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                        }
                                     ) {
-                                        Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("导出 / 分享今日轨迹", style = MaterialTheme.typography.labelSmall)
+                                        Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(20.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("导出 / 分享今日轨迹")
                                     }
                                 }
                             }
@@ -271,17 +273,15 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    AlphaSingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         DefaultHeifPolicy.entries.forEachIndexed { index, policy ->
-                            SegmentedButton(
+                            AlphaSegmentedButton(
                                 selected = heifPolicy == policy,
                                 onClick = { viewModel.setHeifPolicy(policy) },
-                                shape = SegmentedButtonDefaults.itemShape(
-                                    index = index,
-                                    count = DefaultHeifPolicy.entries.size
-                                )
+                                index = index,
+                                count = DefaultHeifPolicy.entries.size
                             ) {
-                                Text(policy.label, style = MaterialTheme.typography.labelSmall)
+                                Text(policy.label)
                             }
                         }
                     }
@@ -333,12 +333,11 @@ fun SettingsScreen(
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column {
                             Text(
                                 text = "当前已配对相机",
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
@@ -352,13 +351,13 @@ fun SettingsScreen(
                         }
 
                         if (uiState.pairedAddress != null) {
-                            OutlinedButton(
+                            AlphaOutlinedButton(
                                 onClick = { showClearDialog = true },
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                colors = AlphaButtonDefaults.outlinedDestructiveColors()
                             ) {
-                                Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("清除记忆", style = MaterialTheme.typography.labelSmall)
+                                Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("清除记忆")
                             }
                         }
                     }
@@ -429,18 +428,18 @@ fun SettingsScreen(
             title = { Text("解除相机配对记忆？") },
             text = { Text("解除后应用将不再自动连接该相机，切换新机身或重新配对时可执行此操作。") },
             confirmButton = {
-                Button(
+                AlphaButton(
                     onClick = {
                         showClearDialog = false
                         viewModel.forgetDevice()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = AlphaButtonDefaults.destructiveColors()
                 ) {
                     Text("确认解除")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) {
+                AlphaTextButton(onClick = { showClearDialog = false }) {
                     Text("取消")
                 }
             }
@@ -549,7 +548,7 @@ private fun ProjectHeroCard(
                         )
                     }
 
-                    IconButton(onClick = onOpenRepo) {
+                    AlphaIconButton(onClick = onOpenRepo) {
                         Icon(
                             imageVector = Icons.Rounded.OpenInNew,
                             contentDescription = "在浏览器中查看",

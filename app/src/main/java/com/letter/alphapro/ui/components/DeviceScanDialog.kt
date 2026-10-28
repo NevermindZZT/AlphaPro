@@ -1,6 +1,8 @@
 package com.letter.alphapro.ui.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -63,7 +65,7 @@ fun DeviceScanDialog(
                 if (isScanning) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 } else {
-                    IconButton(onClick = { onRefreshScan(sonyOnlyFilter) }) {
+                    AlphaIconButton(onClick = { onRefreshScan(sonyOnlyFilter) }) {
                         Icon(Icons.Rounded.Refresh, contentDescription = "重新搜索")
                     }
                 }
@@ -82,31 +84,31 @@ fun DeviceScanDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                // Filter Row: Sony Camera vs All Devices
+                // Filter Row: keep 48dp pill controls readable on narrow dialogs.
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    FilterChip(
+                    AlphaFilterChip(
                         selected = sonyOnlyFilter,
                         onClick = {
                             sonyOnlyFilter = true
                             onRefreshScan(true)
                         },
-                        label = { Text("仅索尼相机", style = MaterialTheme.typography.labelSmall) },
+                        label = { Text("仅索尼相机", style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false) },
                         leadingIcon = if (sonyOnlyFilter) {
-                            { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                            { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(AlphaButtonDefaults.IconSize)) }
                         } else null
                     )
-                    FilterChip(
+                    AlphaFilterChip(
                         selected = !sonyOnlyFilter,
                         onClick = {
                             sonyOnlyFilter = false
                             onRefreshScan(false)
                         },
-                        label = { Text("全部蓝牙设备", style = MaterialTheme.typography.labelSmall) },
+                        label = { Text("全部蓝牙设备", style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false) },
                         leadingIcon = if (!sonyOnlyFilter) {
-                            { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                            { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(AlphaButtonDefaults.IconSize)) }
                         } else null
                     )
                 }
@@ -226,26 +228,20 @@ fun DeviceScanDialog(
 
                                     Spacer(modifier = Modifier.width(8.dp))
 
-                                    Button(
+                                    AlphaButton(
                                         onClick = {
                                             connectingAddress = camera.address
                                             onSelectCamera(camera)
                                         },
                                         enabled = !isConnectingThis,
-                                        shape = RoundedCornerShape(10.dp),
-                                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                                        modifier = Modifier.height(36.dp)
+                                        modifier = Modifier
                                     ) {
                                         if (isConnectingThis) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(16.dp),
-                                                strokeWidth = 2.dp,
-                                                color = MaterialTheme.colorScheme.onPrimary
-                                            )
+                                            AlphaButtonProgress()
                                         } else {
                                             Text(
                                                 text = "连接",
-                                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                                style = MaterialTheme.typography.labelLarge
                                             )
                                         }
                                     }
@@ -257,7 +253,7 @@ fun DeviceScanDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismissRequest) {
+            AlphaTextButton(onClick = onDismissRequest) {
                 Text("关闭")
             }
         }

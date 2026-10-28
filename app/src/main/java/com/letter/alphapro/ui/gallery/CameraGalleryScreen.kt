@@ -1,5 +1,6 @@
 package com.letter.alphapro.ui.gallery
 
+import com.letter.alphapro.ui.components.*
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -62,8 +63,8 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
                 }
             }, actions = {
                 if (connected) {
-                    IconButton(onClick = { viewModel.loadCameraMedia() }, enabled = !state.isMediaLoading) { Icon(Icons.Rounded.Refresh, "刷新") }
-                    IconButton(onClick = { selecting = !selecting; if (!selecting) selected.clear() }) {
+                    AlphaIconButton(onClick = { viewModel.loadCameraMedia() }, enabled = !state.isMediaLoading) { Icon(Icons.Rounded.Refresh, "刷新") }
+                    AlphaIconButton(onClick = { selecting = !selecting; if (!selecting) selected.clear() }) {
                         Icon(if (selecting) Icons.Rounded.Close else Icons.Rounded.Checklist, "多选")
                     }
                 }
@@ -75,11 +76,11 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("已选择 "+selected.size+" 组照片", style = MaterialTheme.typography.titleSmall)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = {
+                            AlphaOutlinedButton(onClick = {
                                 groups.filter { it.id in selected }.flatMap { it.files }.forEach { viewModel.exportPhoto(it, false) }
                                 selected.clear(); selecting = false
                             }, modifier = Modifier.weight(1f)) { Text("原图直出") }
-                            Button(onClick = { exportSheet = true }, modifier = Modifier.weight(1f)) { Text("智能导出") }
+                            AlphaButton(onClick = { exportSheet = true }, modifier = Modifier.weight(1f)) { Text("智能导出") }
                         }
                     }
                 }
@@ -93,7 +94,7 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val labels = listOf("全部 ("+groups.size+")", "HEIF ("+groups.count { it.hasHeif }+")", "RAW ("+groups.count { it.hasRaw }+")")
                     labels.forEachIndexed { index, label ->
-                        FilterChip(selected = filter == index, onClick = { filter = index },
+                        AlphaFilterChip(selected = filter == index, onClick = { filter = index },
                             label = { Text(label, maxLines = 1, softWrap = false) })
                     }
                 }
@@ -103,7 +104,7 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         Icon(Icons.Rounded.WifiOff, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
                         Text("尚未连接相机 Wi-Fi", style = MaterialTheme.typography.titleMedium)
-                        Button(onClick = viewModel::connectCameraWifi,
+                        AlphaButton(onClick = viewModel::connectCameraWifi, size = AlphaButtonSize.Large,
                             enabled = !connecting && state.bleState is SonyBleConnectionState.Ready) {
                             Text(if (connecting) "正在连接…" else "一键直连相机 Wi-Fi")
                         }
@@ -114,7 +115,7 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Rounded.PhotoLibrary, null, Modifier.size(40.dp))
                         Text(if (groups.isEmpty()) "存储卡内暂无照片" else "没有符合当前筛选的照片")
-                        if (filter != 0) TextButton(onClick = { filter = 0 }) { Text("显示全部照片") }
+                        if (filter != 0) AlphaTextButton(onClick = { filter = 0 }) { Text("显示全部照片") }
                     }
                 }
                 else -> LazyVerticalGrid(columns = GridCells.Fixed(3), state = grid,
@@ -181,15 +182,15 @@ private fun PhotoGroupGridCell(
                 if (error == null) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                 else {
                     Icon(Icons.Rounded.BrokenImage, error, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.outline)
-                    TextButton(onClick = onRetry, contentPadding = PaddingValues(2.dp)) { Text("重试缩略图", fontSize = 10.sp) }
+                    AlphaTextButton(onClick = onRetry) { Text("重试缩略图", style = MaterialTheme.typography.labelLarge) }
                 }
             }
-            Surface(Modifier.align(Alignment.TopStart).padding(6.dp), shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primary) {
+            if (!selecting) Surface(Modifier.align(Alignment.TopStart).padding(6.dp), shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primary) {
                 Text(group.badgeLabel, Modifier.padding(horizontal = 4.dp, vertical = 2.dp), color = MaterialTheme.colorScheme.onPrimary,
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), maxLines = 1)
             }
-            if (selecting) FilledIconButton(onClick, Modifier.align(Alignment.TopEnd).padding(4.dp).size(24.dp)) {
-                Icon(if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked, "选择照片", Modifier.size(18.dp))
+            if (selecting) AlphaFilledIconButton(onClick, Modifier.align(Alignment.TopEnd).padding(4.dp)) {
+                Icon(if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked, "选择照片", Modifier.size(AlphaButtonDefaults.IconSize))
             }
             Surface(Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = Color.Black.copy(alpha = 0.55f)) {
                 Text(group.baseName, Modifier.padding(horizontal = 6.dp, vertical = 3.dp), color = Color.White,
