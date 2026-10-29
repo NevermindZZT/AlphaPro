@@ -12,11 +12,11 @@
     <string name="settings_onboarding_description">重新浏览软件特色与使用说明</string>
 
     <!-- Page 1: GPS Heartbeat & Time Sync -->
-    <string name="onboarding_page1_badge">后台守护 · 永不断连</string>
-    <string name="onboarding_page1_title">后台 GPS 守护与微秒对时</string>
-    <string name="onboarding_page1_desc">独创 5 秒心跳保活守护，彻底解决官方 App 定位频繁断连与红标问题。系统级感知相机开机并自动重连，为每张照片精准注入地理位置与毫秒对齐的拍摄时间戳。</string>
-    <string name="onboarding_page1_feat1">5 秒心跳保活，锁屏静止不掉线</string>
-    <string name="onboarding_page1_feat2">微秒级 CC13 自动时钟校准</string>
+    <string name="onboarding_page1_badge">后台同步 · 定位与对时</string>
+    <string name="onboarding_page1_title">后台定位与相机对时</string>
+    <string name="onboarding_page1_desc">通过周期定位同步和相机对时，为拍摄记录位置与时间。需要后台持续同步时，请将定位设为“始终允许”，并为 AlphaPro 关闭电池优化；实际表现仍受手机后台策略影响。</string>
+    <string name="onboarding_page1_feat1">周期定位同步，支持前台服务守护</string>
+    <string name="onboarding_page1_feat2">自动同步相机时钟</string>
     <string name="onboarding_page1_feat3">离线 GPX 轨迹记录与导出</string>
     <string name="onboarding_anim_heartbeat">5s 心跳保活</string>
     <string name="onboarding_anim_time_sync">微秒对时</string>
@@ -52,9 +52,6 @@
     <string name="onboarding_page4_feat3">边拍边传实时大屏检焦看片</string>
     <string name="onboarding_anim_wifi_speed">5GHz Wi-Fi</string>
     <string name="onboarding_anim_ftp_live">FTP 即拍即传</string>
-    <string name="onboarding_diagnostics_title">引导启动记录</string>
-    <string name="onboarding_diagnostics_copy">复制记录</string>
-    <string name="onboarding_diagnostics_privacy">仅在本地记录应用构建、生命周期、引导操作、输入事件类型及无障碍状态；不记录输入文字、定位、相机标识或凭据。</string>
     <string name="onboarding_save_failed">无法保存引导完成状态，请重试。</string>
     <string name="onboarding_skip_confirm_title">现在结束功能引导？</string>
     <string name="onboarding_skip_confirm_message">确认后将进入应用。之后可在“设置 → 使用指南”再次查看。</string>

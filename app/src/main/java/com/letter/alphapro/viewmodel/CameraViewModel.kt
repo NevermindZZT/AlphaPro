@@ -632,6 +632,10 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun startLocationForegroundService(address: String) {
         val app = getApplication<Application>()
+        if (!com.letter.alphapro.data.BackgroundSyncSetupReader.hasForegroundLocation(app)) {
+            _uiState.update { it.copy(userNotice = text(R.string.background_sync_location_required)) }
+            return
+        }
         val intent = Intent(app, LocationSenderForegroundService::class.java).apply {
             putExtra(LocationSenderForegroundService.EXTRA_DEVICE_ADDRESS, address)
         }

@@ -25,7 +25,6 @@ import com.letter.alphapro.data.AppThemeMode
 import com.letter.alphapro.data.AppThemeState
 import com.letter.alphapro.data.CameraPreferences
 import com.letter.alphapro.data.OnboardingActivityFlow
-import com.letter.alphapro.data.OnboardingTrace
 import com.letter.alphapro.ui.navigation.AlphaProApp
 import com.letter.alphapro.ui.onboarding.OnboardingActivity
 import com.letter.alphapro.ui.theme.AlphaProTheme
@@ -34,15 +33,13 @@ import com.letter.alphapro.viewmodel.CameraViewModel
 class MainActivity : AppCompatActivity() {
     private val viewModel: CameraViewModel by viewModels()
     private val preferences by lazy { CameraPreferences(this) }
-    private val onboardingTrace by lazy { OnboardingTrace(this) }
     private var routingToGuide = false
     private var permissionsInFlight = false
     private var permissionsResolved by mutableStateOf(false)
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        onboardingTrace.record("main_permissions_returned granted=${result.values.count { it }} total=${result.size}")
+    ) { _ ->
         permissionsInFlight = false
         permissionsResolved = true
     }
@@ -54,7 +51,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        onboardingTrace.record("O5 main_create restored=${savedInstanceState != null} revision=${preferences.completedOnboardingRevision}")
         // This must precede setContent, permission requests and ANY camera ViewModel access.
         if (routeToGuideIfRequired()) return
 
@@ -87,7 +83,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        onboardingTrace.record("main_new_intent")
         if (!routeToGuideIfRequired() && !permissionsInFlight) requestRequiredPermissions()
     }
 
@@ -96,21 +91,10 @@ class MainActivity : AppCompatActivity() {
         if (!OnboardingActivityFlow.requiresFirstRun(preferences.completedOnboardingRevision)) return false
         if (!routingToGuide) {
             routingToGuide = true
-            onboardingTrace.record("main_route_to_independent_guide")
             startActivity(OnboardingActivity.firstRunIntent(this))
             finish()
         }
         return true
-    }
-
-    override fun onResume() {
-        super.onResume()
-        onboardingTrace.record("main_resume routing=$routingToGuide")
-    }
-
-    override fun onPause() {
-        onboardingTrace.record("main_pause")
-        super.onPause()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -118,21 +102,17 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
     }
 
-    override fun onDestroy() {
-        onboardingTrace.record("main_destroy finishing=$isFinishing changing=$isChangingConfigurations")
-        super.onDestroy()
-    }
-
     private fun requestRequiredPermissions() {
         if (permissionsInFlight || routingToGuide) return
-        onboardingTrace.record("main_permissions_requested")
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             permissions.add(Manifest.permission.BLUETOOTH_SCAN)
             permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
         }
-        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
-        permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (!com.letter.alphapro.data.BackgroundSyncSetupReader.hasForegroundLocation(this)) {
+            permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
             permissions.add(Manifest.permission.READ_MEDIA_IMAGES)

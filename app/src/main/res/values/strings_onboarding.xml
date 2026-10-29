@@ -12,11 +12,11 @@
     <string name="settings_onboarding_description">Review core features and user guide</string>
 
     <!-- Page 1: GPS Heartbeat & Time Sync -->
-    <string name="onboarding_page1_badge">Background Daemon · Always Connected</string>
-    <string name="onboarding_page1_title">Reliable GPS &amp; Clock Sync</string>
-    <string name="onboarding_page1_desc">A 5-second periodic heartbeat keeps the connection alive, preventing disconnections and red warning icons. System-level presence sensing wakes the service automatically, embedding accurate coordinates and microsecond-aligned timestamps into every shot.</string>
-    <string name="onboarding_page1_feat1">5-second heartbeat prevents disconnections</string>
-    <string name="onboarding_page1_feat2">Microsecond CC13 camera clock synchronization</string>
+    <string name="onboarding_page1_badge">Background sync · Location &amp; time</string>
+    <string name="onboarding_page1_title">Background Location &amp; Camera Clock Sync</string>
+    <string name="onboarding_page1_desc">Keep camera geotags and timestamps updated with periodic location sync and clock synchronization. For continued syncing in the background, allow location all the time and remove battery optimization for AlphaPro. Phone background policies still apply.</string>
+    <string name="onboarding_page1_feat1">Periodic geotag updates with a foreground service</string>
+    <string name="onboarding_page1_feat2">Automatic camera clock synchronization</string>
     <string name="onboarding_page1_feat3">Offline GPX track recording and export</string>
     <string name="onboarding_anim_heartbeat">5s Heartbeat</string>
     <string name="onboarding_anim_time_sync">µs Sync</string>
@@ -52,9 +52,6 @@
     <string name="onboarding_page4_feat3">Instant photo review as you shoot</string>
     <string name="onboarding_anim_wifi_speed">5GHz Wi-Fi</string>
     <string name="onboarding_anim_ftp_live">FTP Live Server</string>
-    <string name="onboarding_diagnostics_title">Onboarding launch log</string>
-    <string name="onboarding_diagnostics_copy">Copy log</string>
-    <string name="onboarding_diagnostics_privacy">Recorded locally: app build, lifecycle, guide actions, input event types and accessibility state. No typed text, location, camera identifiers or credentials.</string>
     <string name="onboarding_save_failed">Could not save setup completion. Please try again.</string>
     <string name="onboarding_skip_confirm_title">Leave the walkthrough?</string>
     <string name="onboarding_skip_confirm_message">Confirm to enter the app. You can revisit this guide in Settings → Help &amp; Guides.</string>

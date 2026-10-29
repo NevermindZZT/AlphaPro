@@ -65,8 +65,6 @@ fun SettingsScreen(
     val autoWake by viewModel.autoWake.collectAsState()
 
     var showClearDialog by remember { mutableStateOf(false) }
-    var onboardingReport by remember { mutableStateOf<String?>(null) }
-    val onboardingTrace = remember(context) { com.letter.alphapro.data.OnboardingTrace(context) }
 
     Box(modifier = modifier.fillMaxSize()) {
         Scaffold(
@@ -155,6 +153,7 @@ fun SettingsScreen(
 
             // 3. GPS & Track Settings Group
             SettingsSectionHeader(title = stringResource(R.string.settings_gps_tracks), icon = Icons.Rounded.MyLocation)
+            com.letter.alphapro.ui.components.BackgroundSyncSetupCard()
             SettingsCard {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -391,7 +390,6 @@ fun SettingsScreen(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .clickable {
-                                onboardingTrace.record("settings_launch_replay_activity")
                                 context.startActivity(OnboardingActivity.replayIntent(context))
                             }
                             .padding(vertical = 4.dp),
@@ -429,9 +427,6 @@ fun SettingsScreen(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
                         )
-                    }
-                    AlphaTextButton(onClick = { onboardingReport = onboardingTrace.report() }) {
-                        Text(stringResource(R.string.onboarding_diagnostics_title))
                     }
                 }
             }
@@ -514,29 +509,6 @@ fun SettingsScreen(
                 AlphaTextButton(onClick = { showClearDialog = false }) {
                     Text(stringResource(R.string.settings_cancel))
                 }
-            }
-        )
-    }
-
-    onboardingReport?.let { report ->
-        AlertDialog(
-            onDismissRequest = { onboardingReport = null },
-            title = { Text(stringResource(R.string.onboarding_diagnostics_title)) },
-            text = {
-                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.onboarding_diagnostics_privacy), style = MaterialTheme.typography.bodySmall)
-                    Text(report, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
-                }
-            },
-            confirmButton = {
-                AlphaTextButton(onClick = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.onboarding_diagnostics_title), report))
-                }) { Text(stringResource(R.string.onboarding_diagnostics_copy)) }
-            },
-            dismissButton = {
-                AlphaTextButton(onClick = { onboardingReport = null }) { Text(stringResource(R.string.onboarding_close)) }
             }
         )
     }

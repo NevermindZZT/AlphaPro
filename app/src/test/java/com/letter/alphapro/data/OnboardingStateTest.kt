@@ -12,13 +12,11 @@ class OnboardingStateTest {
     @Test
     fun newSessionDoesNotCompleteWithoutAnExplicitExit() {
         val writes = mutableListOf<Int>()
-        val events = mutableListOf<String>()
-        val session = OnboardingSession(0, writes::add, events::add)
+        val session = OnboardingSession(0, writes::add)
 
         repeat(20) { assertTrue(session.visible.value) }
 
         assertTrue("Construction and observing visibility must not persist completion", writes.isEmpty())
-        assertFalse(events.any { it.startsWith("completion_saved") })
     }
 
     @Test
@@ -54,8 +52,7 @@ class OnboardingStateTest {
     @Test
     fun rawSkipNeverCompletesEvenAfterRepeatedCallbacksOnEveryPage() {
         val writes = mutableListOf<Int>()
-        val events = mutableListOf<String>()
-        val session = OnboardingSession(0, writes::add, events::add)
+        val session = OnboardingSession(0, writes::add)
 
         repeat(100) {
             for (page in 0 until OnboardingSession.PAGE_COUNT) {
@@ -65,7 +62,6 @@ class OnboardingStateTest {
         }
 
         assertTrue(writes.isEmpty())
-        assertFalse(events.any { it.startsWith("completion_saved") })
     }
 
     @Test

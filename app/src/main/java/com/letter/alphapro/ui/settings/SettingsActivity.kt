@@ -26,7 +26,6 @@ class SettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         val preferences = com.letter.alphapro.data.CameraPreferences(this)
         if (com.letter.alphapro.data.OnboardingActivityFlow.requiresFirstRun(preferences.completedOnboardingRevision)) {
-            com.letter.alphapro.data.OnboardingTrace(this).record("settings_route_required_first_run")
             startActivity(com.letter.alphapro.ui.onboarding.OnboardingActivity.firstRunIntent(this))
             finish()
             return

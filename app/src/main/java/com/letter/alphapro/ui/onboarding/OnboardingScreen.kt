@@ -55,8 +55,7 @@ fun OnboardingScreen(
     onExit: (OnboardingExit) -> Unit,
     modifier: Modifier = Modifier,
     isReplay: Boolean = false,
-    actionsEnabled: Boolean = true,
-    onUiAction: (String) -> Unit = {}
+    actionsEnabled: Boolean = true
 ) {
     val coroutineScope = rememberCoroutineScope()
     val pages = remember {
@@ -114,9 +113,7 @@ fun OnboardingScreen(
 
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val latestOnExit by rememberUpdatedState(onExit)
-    val latestUiAction by rememberUpdatedState(onUiAction)
     val requestExit: (OnboardingExitReason) -> Unit = { reason ->
-        latestUiAction("exit reason=$reason page=${pagerState.settledPage}")
         latestOnExit(OnboardingExit(reason, pagerState.settledPage))
     }
 
@@ -270,7 +267,6 @@ fun OnboardingScreen(
                                     if (isLast) {
                                         requestExit(OnboardingExitReason.FINISH)
                                     } else {
-                                        latestUiAction("next page=${pagerState.settledPage}")
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(pagerState.currentPage + 1)
                                         }
@@ -375,6 +371,10 @@ fun OnboardingScreen(
                         }
                     }
 
+                    if (pageIndex == 0) {
+                        Spacer(Modifier.height(14.dp))
+                        BackgroundSyncSetupCard(enabled = actionsEnabled)
+                    }
                     Spacer(Modifier.height(16.dp))
                 }
             }

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="background_sync_setup_title">Keep location sync running</string>
+    <string name="background_sync_setup_intro">For continued location sync in the background, review these two system settings for AlphaPro.</string>
+    <string name="background_sync_location_title">Always allow location</string>
+    <string name="background_sync_location_foreground_hint">Allow location first. If Android no longer shows a prompt, open App permissions. Location accuracy follows your permission choice.</string>
+    <string name="background_sync_location_background_hint">In system App info, choose Permissions → Location → “%1$s”. On some phones the path or wording differs.</string>
+    <string name="background_sync_location_legacy_hint">This Android version has no separate background-location permission. Allowing location is sufficient for this permission check.</string>
+    <string name="background_sync_location_ready_hint">Background location access is allowed. You can review or change it in App permissions.</string>
+    <string name="background_sync_location_missing_foreground">Location not allowed</string>
+    <string name="background_sync_location_missing_background">Background location not allowed</string>
+    <string name="background_sync_location_ready">Location access ready</string>
+    <string name="background_sync_location_grant">Allow location</string>
+    <string name="background_sync_location_always">Set always allow</string>
+    <string name="background_sync_location_manage">App permissions</string>
+    <string name="background_sync_always_label">Allow all the time</string>
+    <string name="background_sync_battery_title">Battery optimization</string>
+    <string name="background_sync_battery_hint">Open the optimization list, choose All apps if needed, find AlphaPro, then select Don’t optimize. This reduces screen-off interruptions without disabling global Battery Saver.</string>
+    <string name="background_sync_battery_ready">Optimization exemption allowed</string>
+    <string name="background_sync_battery_missing">Optimization exemption not allowed</string>
+    <string name="background_sync_battery_unknown">Unable to read exemption status</string>
+    <string name="background_sync_battery_allow">Disable optimization for this app</string>
+    <string name="background_sync_battery_manage">Battery settings</string>
+    <string name="background_sync_setup_caution">These choices are optional and can be revisited here. Some manufacturers also require Unrestricted / Allow background activity in app battery settings. They do not guarantee uninterrupted syncing on every phone.</string>
+    <string name="background_sync_settings_unavailable">Could not open this system page. Please check AlphaPro in system App info.</string>
+    <string name="background_sync_location_settings">Open app settings</string>
+    <string name="background_sync_location_required">Location permission is needed for GPS sync. After allowing it, turn GPS sync on again or reconnect the camera.</string>
+</resources>

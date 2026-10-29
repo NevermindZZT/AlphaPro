@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="background_sync_setup_title">后台持续定位同步</string>
+    <string name="background_sync_setup_intro">需要在后台持续同步定位时，请为 AlphaPro 检查以下两项系统设置。</string>
+    <string name="background_sync_location_title">始终允许定位</string>
+    <string name="background_sync_location_foreground_hint">先允许定位。若系统不再弹窗，可打开“应用权限设置”手动调整；坐标精度取决于定位授权。</string>
+    <string name="background_sync_location_background_hint">在系统“应用信息”中依次选择：权限 → 位置 → “%1$s”。部分手机的路径或名称可能不同。</string>
+    <string name="background_sync_location_legacy_hint">此 Android 版本没有单独的后台定位权限；允许定位即可满足此项权限检查。</string>
+    <string name="background_sync_location_ready_hint">已允许后台使用位置，可在应用权限设置中查看或修改。</string>
+    <string name="background_sync_location_missing_foreground">尚未允许定位</string>
+    <string name="background_sync_location_missing_background">尚未允许后台定位</string>
+    <string name="background_sync_location_ready">定位权限已就绪</string>
+    <string name="background_sync_location_grant">允许定位</string>
+    <string name="background_sync_location_always">设置始终允许</string>
+    <string name="background_sync_location_manage">应用权限设置</string>
+    <string name="background_sync_always_label">始终允许</string>
+    <string name="background_sync_battery_title">电池优化</string>
+    <string name="background_sync_battery_hint">打开电池优化列表，必要时切换为“所有应用”，找到 AlphaPro 后选择“不优化”。这有助于减少锁屏中断，不会关闭全局省电模式。</string>
+    <string name="background_sync_battery_ready">已允许忽略电池优化</string>
+    <string name="background_sync_battery_missing">尚未允许忽略电池优化</string>
+    <string name="background_sync_battery_unknown">暂时无法读取豁免状态</string>
+    <string name="background_sync_battery_allow">关闭此应用的电池优化</string>
+    <string name="background_sync_battery_manage">管理电池设置</string>
+    <string name="background_sync_setup_caution">可稍后在此设置，不强制授权。部分厂商还需在应用耗电管理中选择“不受限制／允许后台活动”；这些设置不保证所有手机均不会中断同步。</string>
+    <string name="background_sync_settings_unavailable">无法打开该系统页面，请在系统“应用信息”中检查 AlphaPro。</string>
+    <string name="background_sync_location_settings">打开应用设置</string>
+    <string name="background_sync_location_required">GPS 同步需要定位权限。授权后请重新开启 GPS 同步或重连相机。</string>
+</resources>
