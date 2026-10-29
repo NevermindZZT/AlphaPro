@@ -193,4 +193,24 @@ git diff --check
   - SHA256：`a39d9e73db04f5cdb9d515c0a61b3c2495a19abce64576e22c0a0626dcfc9a3f`
 - 本地未提交、未推送，保持原有 Release 和标签不变，等待用户体验与进一步指示。
 
+## 使用引导预测性返回手势适配（2026-10-29）
+
+- 用户在 Android 16 设备实测发现，主界面（MainActivity）与设置界面（SettingsActivity）已原生生效预测性返回手势，但使用引导界面（OnboardingActivity）此前未生效。
+- 根因分析：
+  1. 清单文件 `<application>` 未显式声明 `android:enableOnBackInvokedCallback="true"`；
+  2. `OnboardingScreen.kt` 此前无条件常驻启用 `BackHandler`（`enabled = true`），且在设置回看（Replay）模式及第 0 页退出时强行拦截系统返回并在松手后异步调用 `finish()`，导致系统手势框架直接抑制系统的 Cross-Activity 与 Back-to-Home 预测性返回动画。
+- 适配改造：
+  1. 在 `AndroidManifest.xml` 的 `<application>` 节点显式配置 `android:enableOnBackInvokedCallback="true"`，全局开启 Android 13/14+ 系统预测性返回手势；
+  2. 重构 `OnboardingScreen.kt` 的返回手势处理：
+     - 将无条件 `BackHandler` 升级为 `PredictiveBackHandler`，且仅在 `actionsEnabled && !isReplay && pagerState.currentPage > 0`（即首次启动且非第一页）时启用；
+     - **首次引导多页翻页**：当处于 Page 1..3 时，接入 `PredictiveBackHandler` 的进度流，手势滑动过程中通过 `graphicsLayer` 呈现微幅缩放（~8%）与透明度渐变，手势完成时滚动至上一页，手势取消时平滑复原；
+     - **设置回看（Replay 退出）**：`PredictiveBackHandler` 处于禁用状态，由系统原生接管返回手势，完整展现系统级 **Cross-Activity 预测性返回动画**（随侧滑手指逐渐将当前引导界面缩小移出，底层平滑露出 `SettingsActivity`）；
+     - **首次引导第 0 页（Page 0 退出）**：`PredictiveBackHandler` 处于禁用状态，由系统原生接管返回手势，完整展现系统级 **Back-to-Home 预测性返回动画**（随侧滑手指平滑缩小至桌面壁纸）。
+- 验证情况：
+  - 离线 Release 构建通过，`apksigner` 验证 v2/v3 签名有效；
+  - 222 项 JVM 单元测试全部通过（Bluetooth 124, App 50, PTP 48）；
+  - 420 键本地化契约通过；74 处公共组件契约通过；代码空白检查通过；
+  - 测试包产出：`app/build/outputs/apk/release/AlphaPro-1.0.0.16-predictive-back.apk`（大小 12,786,521 字节，SHA256 `743172246728d67ab313b195bcc343b526003c9612d6258e33f60724fbb4cfd3`）。
+- 改动保持本地工作区未提交状态，等待用户体验与进一步确认。
+
 协议细节/设备清单见 `REMOTE_CONTROL_REVIEW.md`；公共UI尺寸和配色见 `UI_COMPONENTS.md`；本地化见 `LOCALIZATION.md`。

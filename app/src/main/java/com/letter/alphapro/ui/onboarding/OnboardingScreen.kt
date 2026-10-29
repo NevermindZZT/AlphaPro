@@ -1,6 +1,7 @@
 package com.letter.alphapro.ui.onboarding
 
-import androidx.activity.compose.BackHandler
+import androidx.activity.BackEventCompat
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -24,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +36,8 @@ import com.letter.alphapro.data.OnboardingExit
 import com.letter.alphapro.data.OnboardingExitReason
 import com.letter.alphapro.ui.components.*
 import com.letter.alphapro.ui.theme.AlphaOrangePrimary
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
 private data class OnboardingPageData(
@@ -117,17 +121,18 @@ fun OnboardingScreen(
         latestOnExit(OnboardingExit(reason, pagerState.settledPage))
     }
 
-    BackHandler {
-        if (!actionsEnabled) return@BackHandler
-        if (isReplay) {
-            requestExit(OnboardingExitReason.BACK)
-        } else if (pagerState.currentPage > 0) {
-            coroutineScope.launch {
-                pagerState.animateScrollToPage(pagerState.currentPage - 1)
+    var backProgress by remember { mutableFloatStateOf(0f) }
+    val shouldInterceptBack = actionsEnabled && !isReplay && pagerState.currentPage > 0
+
+    PredictiveBackHandler(enabled = shouldInterceptBack) { progress: Flow<BackEventCompat> ->
+        try {
+            progress.collect { backEvent ->
+                backProgress = backEvent.progress
             }
-        } else {
-            // Host closes without writing completion. The launcher checks it again next time.
-            requestExit(OnboardingExitReason.BACK)
+            backProgress = 0f
+            pagerState.animateScrollToPage(pagerState.currentPage - 1)
+        } catch (_: CancellationException) {
+            backProgress = 0f
         }
     }
 
@@ -305,6 +310,14 @@ fun OnboardingScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .graphicsLayer {
+                        if (backProgress > 0f) {
+                            val scale = 1f - (backProgress * 0.08f)
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = 1f - (backProgress * 0.2f)
+                        }
+                    }
             ) { pageIndex ->
                 val page = pages[pageIndex]
                 Column(
