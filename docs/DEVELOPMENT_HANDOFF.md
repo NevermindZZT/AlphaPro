@@ -242,4 +242,31 @@ git diff --check
 - 用户随后明确要求只保留 `arm64-v8a`，去掉 `armeabi-v7a/x86_64`。已在app打包和heif编译双层过滤；APK守卫要求唯一ABI为arm64并拒绝额外ABI。以上三ABI证据为初版历史，不再代表当前配置。仅ABI调整后重建Release/签名/产物检查通过，APK确实仅含三个arm64库；既有244项JVM结果保留为基线，本次未重新运行。最新包 `app/build/outputs/apk/release/AlphaPro-1.0.0.18-hif-native-H1-arm64.apk`，14,219,809字节，SHA256 `f3952b8ca9e28b03773cfcd45a6da5129a3e9b8188c78c47fdd88f88a04126f0`。
 - 用户随后回复“提交改动”，授权H1及arm64调整一并本地提交；未授权推送、修改标签或正式Release。该请求未额外提供逐项真机转换/色彩验证证据，上述验证限制保留。
 
+## 下载格式选择弹窗排版与换行优化（2026-10-29）
+
+- 用户提供真机截图反馈下载格式选择弹窗出现非预期折行导致视觉不规整：
+  1. Option 1 推荐徽标在极窄空间内强行折成两行（`推荐` / `分享`）；
+  2. Option 2 标题末尾 `(.ARW)` 孤立折至第二行，后方“专业后期”徽标被挤出屏幕被裁切；
+  3. Option 3 标题末尾 `HEIF` 折至第二行，后方“全部保存”徽标被挤出屏幕被裁切；
+  4. 选项副标题在中文字词中间突兀断行（如“社交发/图”、“电/脑”、“完整双/格式”）；
+  5. 底部转码说明卡片末尾“相册”二字孤立落至第二行。
+- 根因分析：
+  1. 原 `AlertDialog` 采用系统默认平台宽度约束（`usePlatformDefaultWidth = true`），两侧留白过大（~40-50dp），弹窗内可用宽度被压缩至仅约 300dp；
+  2. `DownloadTargetCard` 左侧由 48dp 最小触控区域的 `RadioButton` 与外置 `Icon` 重复占据了 102dp，导致右侧标题/副标题文本列仅剩约 200dp；
+  3. 标题与徽标在同一行内未做权重和非折行约束，文本抢占空间将徽标挤爆折行或顶出卡片外；
+  4. 副标题文案稍长，在极窄宽度下容易在非空格词汇中间断行。
+- 优化实施：
+  1. **弹窗宽度扩展**：设置 `DialogProperties(usePlatformDefaultWidth = false)`，外边距设为对称的 20dp（最大宽度限制 440dp），让手机屏幕宽度得到充分利用；
+  2. **消除 RadioButton 冗余留白**：通过 `LocalMinimumInteractiveComponentEnforcement provides false` 将单选按钮还原为纯视觉的 20dp（整张卡片本身已具备大面积可点击区域），释放近 30dp 水平空间；
+  3. **标题与徽标防挤压排版**：标题设置 `Modifier.weight(1f, fill = false)` 与单行截断，徽标设置 `softWrap = false` 与单行显示，无论在何种屏幕下徽标均绝对保持单行且完整可见；
+  4. **文案精简与词义对齐**：
+     - Option 2 标题改为 `仅下载 RAW 原片`，去除冗余的 `(.ARW)`；
+     - 各副标题与转码说明精炼（如“适合快速分享与浏览”、“适合专业后期调色”、“双格式归档到相册”、“保留拍摄参数并兼容所有相册”），消除单字或截断词孤立折行。
+- 验证情况：
+  - 离线 Release 构建与 v2/v3 签名通过；
+  - `check-heif-apk.py` 验证 APK 仅含 arm64-v8a 架构及其三个解码库；
+  - 244 项 JVM 单元测试全部通过；424 键本地化契约通过；74 处公共组件契约通过；代码空白检查通过；
+  - 测试安装包：`app/build/outputs/apk/release/AlphaPro-1.0.0.19-download-dialog-ui.apk`（大小 14,219,458 字节，SHA256 `af14c82997319b65405dd0a16d70e30a730c9b43903221b750f53d0f001ba6f9`）。
+- 改动保持本地工作区未提交状态，等待用户体验。
+
 协议细节/设备清单见 `REMOTE_CONTROL_REVIEW.md`；公共UI尺寸和配色见 `UI_COMPONENTS.md`；本地化见 `LOCALIZATION.md`。
