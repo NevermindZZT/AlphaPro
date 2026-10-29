@@ -15,9 +15,12 @@
     <string name="settings_gps_interval_description">向相机发送 GPS 坐标心跳包的周期。建议使用 5 秒，避免相机看门狗超时。</string>
     <string name="settings_gpx_logging">后台 GPX 轨迹记录</string>
     <string name="settings_gpx_logging_description">连接期间将路线保存为标准 .gpx 文件，便于导入 Lightroom 或 Google Earth 等应用。</string>
-    <string name="settings_gpx_path">公开路径：内部存储 / Documents / AlphaPro / Tracks /</string>
+    <string name="settings_gpx_path">轨迹保存在 AlphaPro 私有空间，请通过分享导出；卸载应用会删除这些轨迹。</string>
+    <string name="settings_gpx_save_failed">轨迹保存失败，GPS 同步仍继续；未保存的点暂留内存，稍后重试。</string>
+    <string name="settings_gpx_no_track">暂无可分享的轨迹。</string>
+    <string name="settings_gpx_share_failed">无法分享轨迹，请重试。</string>
     <string name="settings_gpx_share_chooser">导出 / 分享 GPX 轨迹</string>
-    <string name="settings_gpx_share_today">导出 / 分享今日轨迹</string>
+    <string name="settings_gpx_share_today">分享当前／最近轨迹</string>
     <string name="settings_gallery_heif">相册与 10-bit HEIF 导出</string>
     <string name="settings_heif_policy">10-bit HEIF 默认导出策略</string>
     <string name="settings_heif_policy_description">选择 10-bit HEIF（HIF）照片的默认导出方式。</string>
@@ -61,6 +64,6 @@
     <string name="dialog_wifi_copy">复制诊断</string>
     <string name="dialog_wifi_close">关闭</string>
     <plurals name="settings_gpx_point_count">
-        <item quantity="other">文件管理器中可见 · 今日已记录 %1$d 个点（每分钟自动保存）</item>
+        <item quantity="other">本次运行已记录 %1$d 个点 · 每分钟尝试自动保存</item>
     </plurals>
 </resources>

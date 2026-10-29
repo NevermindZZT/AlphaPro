@@ -213,4 +213,20 @@ git diff --check
   - 测试包产出：`app/build/outputs/apk/release/AlphaPro-1.0.0.16-predictive-back.apk`（大小 12,786,521 字节，SHA256 `743172246728d67ab313b195bcc343b526003c9612d6258e33f60724fbb4cfd3`）。
 - 改动保持本地工作区未提交状态，等待用户体验与进一步确认。
 
+## GPX 公共目录权限崩溃修复 G1（2026-10-29，已获用户验收）
+
+- 用户提供 Android 运行日志，连续四次 `FileNotFoundException / EACCES` 均来自 `GpxTrackLogger.exportToGpx → flush → LocationSenderForegroundService`，目标为公共 Documents 下当日 GPX。该堆栈不是预测性返回崩溃；不据此归咎引导 Activity。
+- 原 `publicDocs.exists() || publicDocs.mkdirs()` 仅能说明目录存在/创建成功，不能证明 Android 分区存储允许打开该文件。心跳子协程未捕获异常；根部 SupervisorJob 不能隔离普通 activeJob 内的子协程失败。onDestroy 和设置分享也存在未保护的保存调用。
+- 自动记录改为 `filesDir/tracks`，不新增存储权限，不申请所有文件访问；旧 Documents 与旧 app-external 轨迹不删除、不自动强行迁移。私有轨迹随卸载删除，请先分享导出。
+- 周期保存从 5 秒 BLE 心跳中分离，每 60 秒尝试保存；保存边界只捕获 IOException/SecurityException，以 Result 和 saveFailed 状态反映失败，保留内存点、允许后续重试，不抛到服务协程。通知与设置显示失败。GPS 包协议和心跳周期未改。
+- 停服先取消/等待采集任务，再在 IO 协程尽力保存；不在主线程直接写文件。进程被杀仍可能丢失上次保存后的点（约一分钟），不宣称绝对耐久或自动恢复全部未保存内容。
+- Logger 使用独立写锁与点快照，同目录 UTF-8 临时文件写完、flush/fsync 后原子替换；失败不截断上一份成功快照。会话 UUID 和固定会话起始日期避免同日重启覆写旧轨迹，以及跨午夜重复生成全会话快照；这是每进程会话轨迹，不是合并的整日轨迹。运行期间点仍留在内存，长期内存/历史管理不是本轮改造范围。
+- 分享前保存改为 suspend/IO + Result；失败不静默退回旧轨迹、不吞异常；无轨迹/分享失败有双语提示。FileProvider 新增仅 `tracks/` 的 files-path，使用 GPX MIME、只读 URI grant 和 ClipData；设置文案改为私有存储及“当前／最近轨迹”，不再误称公共目录可见或整日导出。接收方稍后打开的仍是当前会话最近原子快照，不承诺点击时不可变副本。
+- 同时修复服务无条件记录的问题：GPX 开关关闭后不新增轨迹点，但不影响向相机发送 GPS；已记录点不删除，仍可保存。
+- 新增 core:location 的 13 项纯 JVM 回归：GPX XML/UTC、会话快照/重启保护、目录失败、SecurityException、写到中途失败保护旧文件、内存保留/恢复、分享不回退旧文件及并发采集/保存。它们不代表 Android FileProvider/设备分区存储路径实测。
+- 最终离线 Release 构建成功，正式 v2/v3 签名校验通过；235 项默认 JVM 结果全部通过（app50/Bluetooth124/PTP48/location13），423 键本地化、74处/15文件公共组件和 diff 空白检查通过。直接检查优化后 APK 的 FileProvider XML，含窄范围 `files-path/tracks/`，DEX 含安全保存方法，无旧 `AlphaPro/Tracks` 自动存储路径，不含所有文件访问权限。
+- G1 测试包：`app/build/outputs/apk/release/AlphaPro-1.0.0.17-gpx-storage-G1.apk`，12,793,960 字节；SHA256 `0a3da9f0e28d7dc89c3c5444db68a2b58eecbc56ea7d58d2fdc2a22ae834989e`。
+- 未连接 Android 真机进行本轮验证，13 项可选 Android 运行时测试未启用。请在原崩溃设备连续记录至少3分钟（跨多次60秒保存）、前后台切换、停止/重启GPS服务，并从设置分享GPX给接收应用检查可读；关闭GPX应不再新增点但相机GPS继续同步。无需清除应用数据，不要求重新授予公共存储权限。
+- 用户随后回复“OK, 提交改动”，概括验收 G1 并明确授权本轮本地提交；不视为上述设备、系统分享或失败路径已逐项覆盖。未授权推送、修改标签或更新正式 Release。
+
 协议细节/设备清单见 `REMOTE_CONTROL_REVIEW.md`；公共UI尺寸和配色见 `UI_COMPONENTS.md`；本地化见 `LOCALIZATION.md`。

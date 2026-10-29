@@ -15,9 +15,12 @@
     <string name="settings_gps_interval_description">How often GPS coordinates are sent to the camera. The recommended interval is 5 seconds to help avoid camera watchdog timeouts.</string>
     <string name="settings_gpx_logging">Background GPX track recording</string>
     <string name="settings_gpx_logging_description">Save your route as a standard .gpx file while connected, for use in apps such as Lightroom or Google Earth.</string>
-    <string name="settings_gpx_path">Public path: Internal storage / Documents / AlphaPro / Tracks /</string>
+    <string name="settings_gpx_path">Saved privately by AlphaPro. Use Share to export; uninstalling the app removes these tracks.</string>
+    <string name="settings_gpx_save_failed">Track save failed. GPS sync continues; unsaved points remain in memory for retry.</string>
+    <string name="settings_gpx_no_track">No track available to share yet.</string>
+    <string name="settings_gpx_share_failed">Unable to share the track. Please try again.</string>
     <string name="settings_gpx_share_chooser">Export / share GPX track</string>
-    <string name="settings_gpx_share_today">Export / share today’s track</string>
+    <string name="settings_gpx_share_today">Share current / latest track</string>
     <string name="settings_gallery_heif">Gallery &amp; 10-bit HEIF export</string>
     <string name="settings_heif_policy">Default 10-bit HEIF export policy</string>
     <string name="settings_heif_policy_description">Choose how to export 10-bit HEIF (HIF) photos.</string>
@@ -61,7 +64,7 @@
     <string name="dialog_wifi_copy">Copy diagnostics</string>
     <string name="dialog_wifi_close">Close</string>
     <plurals name="settings_gpx_point_count">
-        <item quantity="one">Visible in your file manager · %1$d point recorded today (saved every minute)</item>
-        <item quantity="other">Visible in your file manager · %1$d points recorded today (saved every minute)</item>
+        <item quantity="one">%1$d point in this session · automatic save attempted every minute</item>
+        <item quantity="other">%1$d points in this session · automatic save attempted every minute</item>
     </plurals>
 </resources>

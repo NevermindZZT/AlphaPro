@@ -75,8 +75,8 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         return gpxLogger.pointCount
     }
 
-    fun flushAndGetGpxFile(): File? {
-        return gpxLogger.flush() ?: gpxLogger.getLatestTrackFile()
+    suspend fun flushAndGetGpxFile(): Result<File?> = withContext(Dispatchers.IO) {
+        gpxLogger.fileForSharing()
     }
 
     private val _discoveredCameras = MutableStateFlow<List<DiscoveredCamera>>(emptyList())

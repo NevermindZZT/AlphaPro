@@ -2,5 +2,6 @@
 <paths>
     <external-path name="external_files" path="." />
     <external-files-path name="app_external_files" path="." />
+    <files-path name="gpx_tracks" path="tracks/" />
     <cache-path name="cache" path="." />
 </paths>

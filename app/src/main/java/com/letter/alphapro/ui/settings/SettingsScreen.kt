@@ -6,6 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.widget.Toast
+import android.content.ActivityNotFoundException
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -60,6 +63,9 @@ fun SettingsScreen(
     val dynamicColor by viewModel.dynamicColor.collectAsState()
     val gpsInterval by viewModel.gpsInterval.collectAsState()
     val isGpxLogging by viewModel.isGpxLogging.collectAsState()
+    val gpxSaveFailed by viewModel.gpxLogger.saveFailed.collectAsState()
+    val exportScope = rememberCoroutineScope()
+    var exportingTrack by remember { mutableStateOf(false) }
     val heifPolicy by viewModel.heifPolicy.collectAsState()
     val jpegQuality by viewModel.jpegQuality.collectAsState()
     val autoWake by viewModel.autoWake.collectAsState()
@@ -232,27 +238,50 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
 
+                                if (gpxSaveFailed) Text(
+                                    text = stringResource(R.string.settings_gpx_save_failed),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.End
                                 ) {
                                     AlphaButton(
+                                        enabled = !exportingTrack,
                                         onClick = {
-                                            val gpxFile = viewModel.flushAndGetGpxFile()
-                                            if (gpxFile != null && gpxFile.exists()) {
+                                            exportingTrack = true
+                                            exportScope.launch {
                                                 try {
+                                                    val result = viewModel.flushAndGetGpxFile()
+                                                    if (result.isFailure) {
+                                                        Toast.makeText(context, R.string.settings_gpx_save_failed, Toast.LENGTH_LONG).show()
+                                                        return@launch
+                                                    }
+                                                    val gpxFile = result.getOrNull()
+                                                    if (gpxFile == null) {
+                                                        Toast.makeText(context, R.string.settings_gpx_no_track, Toast.LENGTH_SHORT).show()
+                                                        return@launch
+                                                    }
                                                     val uri = androidx.core.content.FileProvider.getUriForFile(
-                                                        context,
-                                                        context.packageName + ".fileprovider",
-                                                        gpxFile
+                                                        context, context.packageName + ".fileprovider", gpxFile
                                                     )
                                                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                                         type = "application/gpx+xml"
                                                         putExtra(Intent.EXTRA_STREAM, uri)
+                                                        clipData = ClipData.newRawUri("GPX track", uri)
                                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                                     }
                                                     context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.settings_gpx_share_chooser)))
-                                                } catch (_: Exception) {}
+                                                } catch (_: ActivityNotFoundException) {
+                                                    Toast.makeText(context, R.string.settings_gpx_share_failed, Toast.LENGTH_LONG).show()
+                                                } catch (_: IllegalArgumentException) {
+                                                    Toast.makeText(context, R.string.settings_gpx_share_failed, Toast.LENGTH_LONG).show()
+                                                } catch (_: SecurityException) {
+                                                    Toast.makeText(context, R.string.settings_gpx_share_failed, Toast.LENGTH_LONG).show()
+                                                } finally {
+                                                    exportingTrack = false
+                                                }
                                             }
                                         }
                                     ) {

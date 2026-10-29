@@ -37,6 +37,7 @@ class LocationSenderForegroundService : Service() {
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val preferences by lazy { com.letter.alphapro.data.CameraPreferences(this) }
     private lateinit var gattManager: SonyBleGattManager
     private lateinit var locationEngine: AdaptiveLocationEngine
     private lateinit var gpxLogger: GpxTrackLogger
@@ -92,7 +93,9 @@ class LocationSenderForegroundService : Service() {
             // 2. Collect location updates from engine
             launch {
                 locationEngine.getFilteredLocationUpdates().collect { coord ->
-                    gpxLogger.recordPoint(coord)
+                    if (preferences.isGpxTrackLoggingEnabled) {
+                        gpxLogger.recordPoint(coord)
+                    }
                     lastSentCoordinate = Pair(coord.latitude, coord.longitude)
                     if (gattManager.connectionState.value is SonyBleConnectionState.Ready) {
                         gattManager.sendLocation(coord.latitude, coord.longitude)
@@ -104,7 +107,6 @@ class LocationSenderForegroundService : Service() {
             // Sony cameras have a 10s watchdog timer: if no location packet is received within ~10s,
             // the camera switches back to the prohibited GPS icon!
             launch {
-                var lastGpxFlushTime = System.currentTimeMillis()
                 while (isActive) {
                     delay(5000)
                     lastSentCoordinate?.let { (lat, lng) ->
@@ -112,12 +114,16 @@ class LocationSenderForegroundService : Service() {
                             gattManager.sendLocation(lat, lng)
                         }
                     }
+                }
+            }
 
-                    // Flush GPX track to disk every 60 seconds
-                    if (System.currentTimeMillis() - lastGpxFlushTime > 60_000L) {
-                        lastGpxFlushTime = System.currentTimeMillis()
-                        gpxLogger.flush()
-                    }
+            // Disk I/O is independent of the 5-second BLE heartbeat. A denied/full
+            // filesystem must not cancel the location collector or kill the process.
+            launch {
+                while (isActive) {
+                    delay(60_000L)
+                    gpxLogger.flushSafely()
+                    refreshNotification()
                 }
             }
         }
@@ -139,15 +145,23 @@ class LocationSenderForegroundService : Service() {
             is SonyBleConnectionState.Disconnected -> text(R.string.runtime_notification_disconnected)
             is SonyBleConnectionState.Error -> text(R.string.runtime_notification_error, state.message)
         }
+        val content = if (gpxLogger.saveFailed.value) {
+            "$status · ${text(R.string.settings_gpx_save_failed)}"
+        } else status
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.notify(NOTIFICATION_ID, buildNotification(text(R.string.runtime_notification_title), status))
+        manager.notify(NOTIFICATION_ID, buildNotification(text(R.string.runtime_notification_title), content))
     }
 
     override fun onDestroy() {
         super.onDestroy()
         try { unregisterReceiver(languageReceiver) } catch (_: IllegalArgumentException) {}
-        gpxLogger.flush()
-        serviceScope.cancel()
+        val running = activeJob
+        running?.cancel()
+        // Best effort only: process death can still interrupt this final save.
+        serviceScope.launch {
+            running?.join()
+            gpxLogger.flushSafely()
+        }.invokeOnCompletion { serviceScope.cancel() }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

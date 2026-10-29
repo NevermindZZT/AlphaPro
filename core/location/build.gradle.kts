@@ -24,4 +24,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.play.services.location)
+    testImplementation("junit:junit:4.13.2")
 }

@@ -24,16 +24,9 @@ class AlphaProApplication : Application(), ImageLoaderFactory {
         gattManager = SonyBleGattManager(this, messageContext = { com.letter.alphapro.data.AppLanguage.localizedContext(this) })
         val locationSource = FusedLocationSource(this)
         locationEngine = AdaptiveLocationEngine(locationSource)
-        val publicDocs = File(
-            android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOCUMENTS),
-            "AlphaPro/Tracks"
-        )
-        val gpxDir = if (publicDocs.exists() || publicDocs.mkdirs()) {
-            publicDocs
-        } else {
-            File(getExternalFilesDir(null), "tracks").apply { mkdirs() }
-        }
-        gpxLogger = GpxTrackLogger(gpxDir)
+        // Automatic recording belongs in app-owned storage, not public Documents.
+        // Directory existence/mkdirs does not grant scoped-storage write access.
+        gpxLogger = GpxTrackLogger(File(filesDir, "tracks"))
     }
 
     override fun newImageLoader(): ImageLoader {
