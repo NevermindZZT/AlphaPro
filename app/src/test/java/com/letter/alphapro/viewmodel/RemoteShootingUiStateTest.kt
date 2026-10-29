@@ -26,4 +26,9 @@ class RemoteShootingUiStateTest {
         val state = RemoteShootingUiState(releaseUnconfirmed = true)
         assertFalse(state.isBusy); assertTrue(state.releaseUnconfirmed)
     }
+    @Test fun singleModeIsBusyWhileActiveWithoutTriggeringLongRunning() {
+        val state = RemoteShootingUiState(mode = RemoteOperationMode.SINGLE, phase = RemoteOperationPhase.RUNNING)
+        assertTrue(state.isBusy)
+        assertFalse(state.isLongRunning)
+    }
 }

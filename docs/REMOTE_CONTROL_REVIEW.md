@@ -51,6 +51,33 @@ product copy; no ViewModel, GATT, controller or shared shutter behavior is chang
   in the status area/pinned action. Compact auxiliary actions retain Material touch
   targets and wrapping; shared visual size tokens remain unchanged.
 
+## R4 layout & unified shutter simplification (2026-10-29)
+
+Following user analysis that camera drive mode (Single vs Cont. Shooting) controls
+burst behavior on physical Sony bodies and App shutter/AF/movie controls are otherwise
+identical, the 4-mode segmented row is simplified into two clear functional domains:
+
+- **Standard Remote (标准遥控)**: Default mode for immediate shooting.
+  - Unified 160dp shutter button (`AlphaHoldShutterButton` with `captureUnified`):
+    - Pure centered camera icon (64dp); internal text removed so the icon is never squeezed off-center.
+    - Status/stopping text renders below the button without shifting button geometry.
+    - Tap (< 300ms): sends 07, waits 150ms, sends 09, holds 09 for 150ms min full press,
+      releases 08/50ms/06. Matches verified single sequence byte-for-byte and millisecond-for-millisecond.
+    - Hold (>= 300ms): sends 07/150ms/09, holds full-down until finger-up, releases 08/50ms/06.
+    - TalkBack / accessibility click triggers single photo via `onTap`.
+  - Prominent AF lock (AF-ON toggle) and movie recording (REC toggle) auxiliary row:
+    enlarged to `AlphaButtonSize.Large` (48dp min height, 20dp icon, 50% row weight) for easy one-handed thumb reach.
+  - No parameter sliders or empty space; viewport resting inset centers cleanly.
+- **Timed Shooting (定时拍摄)**: Automated tasks requiring app-scheduled timing.
+  - 160dp shutter uses centered icon-only display; action label/clock sits cleanly below.
+  - Sub-selector: BULB Exposure (B 门长曝光) vs Interval (间隔拍摄).
+  - BULB: exposure duration slider (1..3600s log scale, exact dialog); start/stop timer.
+  - Interval: shooting interval (1..3600s log scale) and count (1..999 linear); start/stop.
+  - Full-screen monospace clock, remaining time / trigger progress, and next trigger countdown.
+  - Foreground guidance and error notice cards retained.
+- All Bluetooth transport guarantees (session pinning, non-cancellable release cleanup,
+  pinned bottom stop bar, back-handler protection, keep-screen-on) remain fully preserved.
+
 Source review/build success is not Android screenshot or gesture validation. Check
 320/360/412dp, short landscape and wide windows; Chinese/English, light/dark theme,
 large fonts, and idle/running/stopping/error states. In particular verify shutter

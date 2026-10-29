@@ -4,9 +4,15 @@
     <string name="remote_product_burst">Burst</string>
     <string name="remote_product_bulb">BULB</string>
     <string name="remote_product_interval">Interval</string>
+    <string name="remote_product_mode_standard">Standard</string>
+    <string name="remote_product_mode_timed">Timed</string>
+    <string name="remote_product_bulb_timed_title">BULB Exposure</string>
+    <string name="remote_product_interval_title">Interval</string>
+    <string name="remote_product_shutter_standard">Shutter</string>
     <string name="remote_product_hold_mode">Hold</string>
     <string name="remote_product_timer_mode">Timer</string>
     <string name="remote_product_connected">Bluetooth connected</string>
+    <string name="remote_product_standard_hint">Tap to shoot, hold for continuous shooting (set camera drive to Continuous). AF and movie controls supported.</string>
     <string name="remote_product_single_hint">Enable Bluetooth remote control on the camera. Drive and exposure settings remain under camera control.</string>
     <string name="remote_product_burst_hint">Set the camera drive to Continuous Shooting. Hold the shutter to shoot; release to stop. Speed is determined by the camera.</string>
     <string name="remote_product_bulb_hint">Set the camera to M and BULB with compatible shutter/drive settings, and turn off its BULB Timer. Hold starts exposure; release sends the end press. Timer mode ends at the planned time. This app does not change camera settings.</string>

@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -31,32 +32,45 @@ import com.letter.alphapro.viewmodel.CameraViewModel
 import com.letter.alphapro.viewmodel.RemoteOperationMode
 import com.letter.alphapro.viewmodel.RemoteOperationPhase
 
-private enum class RemoteShootingMode(val label: Int, val operation: RemoteOperationMode) {
-    SINGLE(R.string.remote_product_single, RemoteOperationMode.SINGLE),
-    BURST(R.string.remote_product_burst, RemoteOperationMode.BURST),
-    BULB(R.string.remote_product_bulb, RemoteOperationMode.BULB),
-    INTERVAL(R.string.remote_product_interval, RemoteOperationMode.INTERVAL)
+private enum class RemoteTopMode(val label: Int) {
+    STANDARD(R.string.remote_product_mode_standard),
+    TIMED(R.string.remote_product_mode_timed)
 }
-private enum class BulbControl { HOLD, TIMER }
+
+private enum class TimedShootingMode(val label: Int, val operation: RemoteOperationMode) {
+    BULB(R.string.remote_product_bulb_timed_title, RemoteOperationMode.BULB),
+    INTERVAL(R.string.remote_product_interval_title, RemoteOperationMode.INTERVAL)
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun RemoteShutterScreen(viewModel: CameraViewModel, modifier: Modifier = Modifier) {
     val camera by viewModel.uiState.collectAsState()
     val remote by viewModel.remoteShooting.collectAsState()
-    var selected by rememberSaveable { mutableStateOf(RemoteShootingMode.SINGLE) }
-    var bulbControl by rememberSaveable { mutableStateOf(BulbControl.HOLD) }
+    var topMode by rememberSaveable { mutableStateOf(RemoteTopMode.STANDARD) }
+    var timedMode by rememberSaveable { mutableStateOf(TimedShootingMode.BULB) }
     var bulbSeconds by rememberSaveable { mutableIntStateOf(30) }
     var intervalSeconds by rememberSaveable { mutableIntStateOf(5) }
     var intervalCount by rememberSaveable { mutableIntStateOf(10) }
     val ready = camera.bleState is SonyBleConnectionState.Ready
     val unlocked = !remote.isBusy && !remote.releaseUnconfirmed
     val canStart = ready && unlocked
-    val mode = if (remote.isLongRunning) RemoteShootingMode.entries.firstOrNull { it.operation == remote.mode } ?: selected else selected
-    val ownOperation = remote.isLongRunning && remote.mode == mode.operation
+
+    val activeTopMode = if (remote.isLongRunning) {
+        if (remote.mode in listOf(RemoteOperationMode.BULB, RemoteOperationMode.INTERVAL)) RemoteTopMode.TIMED
+        else RemoteTopMode.STANDARD
+    } else topMode
+
+    val activeTimedMode = if (remote.isLongRunning && remote.mode in listOf(RemoteOperationMode.BULB, RemoteOperationMode.INTERVAL)) {
+        if (remote.mode == RemoteOperationMode.BULB) TimedShootingMode.BULB else TimedShootingMode.INTERVAL
+    } else timedMode
+
+    val ownOperation = remote.isLongRunning && when (activeTopMode) {
+        RemoteTopMode.STANDARD -> remote.mode == RemoteOperationMode.BURST
+        RemoteTopMode.TIMED -> remote.mode == activeTimedMode.operation
+    }
     val stopping = ownOperation && remote.phase == RemoteOperationPhase.STOPPING
-    val manualBulb = if (ownOperation && mode == RemoteShootingMode.BULB) remote.manualHold else bulbControl == BulbControl.HOLD
-    val ownHold = ownOperation && remote.manualHold
+    val ownHold = remote.isBusy && remote.manualHold
     val holdEnabled = ready && !remote.releaseUnconfirmed && (canStart || (ownHold && !stopping))
 
     BackHandler(enabled = remote.isLongRunning || remote.releaseUnconfirmed) {
@@ -107,21 +121,16 @@ fun RemoteShutterScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
             AlphaSingleChoiceSegmentedButtonRow(
                 Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(top = 12.dp)
             ) {
-                RemoteShootingMode.entries.forEachIndexed { index, choice ->
-                    AlphaSegmentedButton(selected = mode == choice, onClick = { selected = choice },
-                        index = index, count = RemoteShootingMode.entries.size, enabled = unlocked) { Text(stringResource(choice.label)) }
+                RemoteTopMode.entries.forEachIndexed { index, choice ->
+                    AlphaSegmentedButton(selected = activeTopMode == choice, onClick = { topMode = choice },
+                        index = index, count = RemoteTopMode.entries.size, enabled = unlocked) { Text(stringResource(choice.label)) }
                 }
             }
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                // Balance sparse modes without stretching the card or shutter. This inset
-                // depends only on viewport/mode, NEVER live status: a held shutter must
-                // not move under the finger when its timer or feedback first appears.
-                val sparse = mode == RemoteShootingMode.SINGLE || mode == RemoteShootingMode.BURST
-                val restingContentHeight = if (mode == RemoteShootingMode.SINGLE) 360.dp else 480.dp
-                // Include the pinned action bar's space: its appearance must not
-                // change the resting inset while the user is holding the shutter.
+                val isStandard = activeTopMode == RemoteTopMode.STANDARD
+                val restingContentHeight = if (isStandard) 380.dp else 500.dp
                 val availableHeight = maxHeight + padding.calculateBottomPadding()
-                val topInset = if (sparse) ((availableHeight - restingContentHeight) / 2)
+                val topInset = if (isStandard) ((availableHeight - restingContentHeight) / 2)
                     .coerceIn(16.dp, 80.dp) else 16.dp
                 Column(
                     Modifier.widthIn(max = 560.dp).fillMaxWidth().align(Alignment.TopCenter)
@@ -138,110 +147,164 @@ fun RemoteShutterScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                stringResource(when (mode) {
-                                    RemoteShootingMode.SINGLE -> R.string.remote_product_single_hint
-                                    RemoteShootingMode.BURST -> R.string.remote_product_burst_hint
-                                    RemoteShootingMode.BULB -> R.string.remote_product_bulb_hint
-                                    RemoteShootingMode.INTERVAL -> R.string.remote_product_interval_hint
-                                }),
-                                Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            if (mode == RemoteShootingMode.BULB) {
+                            if (isStandard) {
+                                Text(
+                                    stringResource(R.string.remote_product_standard_hint),
+                                    Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                val label = stringResource(when {
+                                    stopping -> R.string.remote_product_stopping_short
+                                    ownHold -> R.string.remote_product_release_to_stop
+                                    else -> R.string.remote_product_shutter_standard
+                                })
+                                Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
+                                    AlphaHoldShutterButton(
+                                        onPress = viewModel::pressShutter,
+                                        onRelease = viewModel::releaseRemotePress,
+                                        onStop = viewModel::stopRemoteShooting,
+                                        enabled = holdEnabled,
+                                        active = ownHold,
+                                        actionLabel = label,
+                                        stateLabel = label,
+                                        onTap = viewModel::takePhoto
+                                    ) {
+                                        Icon(Icons.Rounded.Camera, null, Modifier.size(64.dp))
+                                    }
+                                }
+                                if (ownHold || stopping) {
+                                    Text(
+                                        stringResource(if (stopping) R.string.remote_product_stopping_short else R.string.remote_product_release_to_stop),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            } else {
                                 AlphaSingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                                    AlphaSegmentedButton(selected = manualBulb, onClick = { bulbControl = BulbControl.HOLD },
-                                        index = 0, count = 2, enabled = unlocked) { Text(stringResource(R.string.remote_product_hold_mode)) }
-                                    AlphaSegmentedButton(selected = !manualBulb, onClick = { bulbControl = BulbControl.TIMER },
-                                        index = 1, count = 2, enabled = unlocked) { Text(stringResource(R.string.remote_product_timer_mode)) }
-                                }
-                                if (!manualBulb) AlphaParameterSlider(
-                                    label = stringResource(R.string.remote_product_duration), value = bulbSeconds,
-                                    onValueChange = { bulbSeconds = it }, valueRange = 1..3600,
-                                    valueLabel = stringResource(R.string.remote_product_seconds, bulbSeconds), enabled = unlocked, logarithmic = true)
-                            }
-                            if (mode == RemoteShootingMode.INTERVAL) {
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    AlphaParameterSlider(label = stringResource(R.string.remote_product_interval_seconds), value = intervalSeconds,
-                                        onValueChange = { intervalSeconds = it }, valueRange = 1..3600,
-                                        valueLabel = stringResource(R.string.remote_product_seconds, intervalSeconds), enabled = unlocked, logarithmic = true)
-                                    AlphaParameterSlider(label = stringResource(R.string.remote_product_count), value = intervalCount,
-                                        onValueChange = { intervalCount = it }, valueRange = 1..999,
-                                        valueLabel = stringResource(R.string.remote_product_count_value, intervalCount), enabled = unlocked)
-                                }
-                            }
-                            val manual = mode == RemoteShootingMode.BURST || (mode == RemoteShootingMode.BULB && manualBulb)
-                            val label = stringResource(when {
-                                stopping -> R.string.remote_product_stopping_short
-                                mode == RemoteShootingMode.SINGLE -> R.string.control_take_photo
-                                manual && ownHold -> R.string.remote_product_release_to_stop
-                                manual && mode == RemoteShootingMode.BURST -> R.string.remote_product_hold_burst
-                                manual -> R.string.remote_product_hold_bulb
-                                ownOperation -> R.string.remote_product_stop
-                                mode == RemoteShootingMode.BULB -> R.string.remote_product_start_timer
-                                else -> R.string.remote_product_start_interval
-                            })
-                            // Keep one stable interactive subtree; status is below the
-                            // shutter so it cannot displace the held target on touch-down.
-                            Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
-                                key(mode, manual) {
-                                    if (manual) AlphaHoldShutterButton(
-                                        onPress = { if (mode == RemoteShootingMode.BURST) viewModel.pressBurst() else viewModel.pressBulb() },
-                                        onRelease = viewModel::releaseRemotePress, onStop = viewModel::stopRemoteShooting,
-                                        enabled = holdEnabled, active = ownHold, actionLabel = label, stateLabel = label) {
-                                        Icon(Icons.Rounded.Camera, null, Modifier.size(54.dp))
-                                        Text(label, style = MaterialTheme.typography.labelLarge)
-                                    } else AlphaShutterButton(onClick = {
-                                        when {
-                                            ownOperation -> viewModel.stopRemoteShooting()
-                                            mode == RemoteShootingMode.SINGLE -> viewModel.takePhoto()
-                                            mode == RemoteShootingMode.BULB -> viewModel.startTimedBulb(bulbSeconds)
-                                            else -> viewModel.startIntervalometer(intervalSeconds, intervalCount)
-                                        }
-                                    }, enabled = if (ownOperation) !stopping else canStart, active = ownOperation) {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            Icon(Icons.Rounded.Camera, null, Modifier.size(54.dp))
-                                            Text(label, style = MaterialTheme.typography.labelLarge)
+                                    TimedShootingMode.entries.forEachIndexed { index, choice ->
+                                        AlphaSegmentedButton(
+                                            selected = activeTimedMode == choice,
+                                            onClick = { timedMode = choice },
+                                            index = index,
+                                            count = TimedShootingMode.entries.size,
+                                            enabled = unlocked
+                                        ) {
+                                            Text(stringResource(choice.label))
                                         }
                                     }
                                 }
-                            }
-                            if (ownOperation || remote.mode == mode.operation && (remote.elapsedSeconds > 0 || remote.submittedTriggers > 0)) {
-                                Column(
-                                    Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Text(stringResource(R.string.remote_product_clock, remote.elapsedSeconds / 60, remote.elapsedSeconds % 60),
-                                        style = MaterialTheme.typography.headlineMedium, fontFamily = FontFamily.Monospace)
-                                    if (stopping) Text(stringResource(R.string.remote_modes_stopping),
-                                        style = MaterialTheme.typography.bodySmall)
-                                    if (!remote.manualHold && mode == RemoteShootingMode.BULB) Text(
-                                        stringResource(R.string.remote_product_remaining, remote.remainingSeconds), style = MaterialTheme.typography.bodySmall)
-                                    if (mode == RemoteShootingMode.INTERVAL) {
-                                        Text(stringResource(R.string.remote_product_progress, remote.submittedTriggers, remote.totalTriggers))
-                                        if (ownOperation && !stopping) Text(stringResource(R.string.remote_product_next, remote.nextTriggerSeconds),
-                                            style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    stringResource(if (activeTimedMode == TimedShootingMode.BULB) R.string.remote_product_bulb_hint else R.string.remote_product_interval_hint),
+                                    Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (activeTimedMode == TimedShootingMode.BULB) {
+                                    AlphaParameterSlider(
+                                        label = stringResource(R.string.remote_product_duration), value = bulbSeconds,
+                                        onValueChange = { bulbSeconds = it }, valueRange = 1..3600,
+                                        valueLabel = stringResource(R.string.remote_product_seconds, bulbSeconds),
+                                        enabled = unlocked, logarithmic = true
+                                    )
+                                } else {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        AlphaParameterSlider(
+                                            label = stringResource(R.string.remote_product_interval_seconds), value = intervalSeconds,
+                                            onValueChange = { intervalSeconds = it }, valueRange = 1..3600,
+                                            valueLabel = stringResource(R.string.remote_product_seconds, intervalSeconds),
+                                            enabled = unlocked, logarithmic = true
+                                        )
+                                        AlphaParameterSlider(
+                                            label = stringResource(R.string.remote_product_count), value = intervalCount,
+                                            onValueChange = { intervalCount = it }, valueRange = 1..999,
+                                            valueLabel = stringResource(R.string.remote_product_count_value, intervalCount),
+                                            enabled = unlocked
+                                        )
+                                    }
+                                }
+                                val timedLabel = stringResource(when {
+                                    stopping -> R.string.remote_product_stopping_short
+                                    ownOperation -> R.string.remote_product_stop
+                                    activeTimedMode == TimedShootingMode.BULB -> R.string.remote_product_start_timer
+                                    else -> R.string.remote_product_start_interval
+                                })
+                                Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
+                                    AlphaShutterButton(
+                                        onClick = {
+                                            when {
+                                                ownOperation -> viewModel.stopRemoteShooting()
+                                                activeTimedMode == TimedShootingMode.BULB -> viewModel.startTimedBulb(bulbSeconds)
+                                                else -> viewModel.startIntervalometer(intervalSeconds, intervalCount)
+                                            }
+                                        },
+                                        enabled = if (ownOperation) !stopping else canStart,
+                                        active = ownOperation
+                                    ) {
+                                        Icon(Icons.Rounded.Camera, null, Modifier.size(64.dp))
+                                    }
+                                }
+                                if (!ownOperation && !stopping) {
+                                    Text(
+                                        timedLabel,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                if (ownOperation || (remote.isBusy && remote.mode == activeTimedMode.operation && (remote.elapsedSeconds > 0 || remote.submittedTriggers > 0))) {
+                                    Column(
+                                        Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(stringResource(R.string.remote_product_clock, remote.elapsedSeconds / 60, remote.elapsedSeconds % 60),
+                                            style = MaterialTheme.typography.headlineMedium, fontFamily = FontFamily.Monospace)
+                                        if (stopping) Text(stringResource(R.string.remote_modes_stopping), style = MaterialTheme.typography.bodySmall)
+                                        if (activeTimedMode == TimedShootingMode.BULB) Text(
+                                            stringResource(R.string.remote_product_remaining, remote.remainingSeconds), style = MaterialTheme.typography.bodySmall)
+                                        if (activeTimedMode == TimedShootingMode.INTERVAL) {
+                                            Text(stringResource(R.string.remote_product_progress, remote.submittedTriggers, remote.totalTriggers))
+                                            if (ownOperation && !stopping) Text(stringResource(R.string.remote_product_next, remote.nextTriggerSeconds),
+                                                style = MaterialTheme.typography.bodySmall)
+                                        }
                                     }
                                 }
                             }
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            FlowRow(
-                                Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                AlphaTonalButton(onClick = viewModel::toggleAfLock, enabled = canStart, size = AlphaButtonSize.Compact) {
-                                    Icon(Icons.Rounded.CenterFocusStrong, null, Modifier.size(AlphaButtonSize.Compact.iconSize))
-                                    Spacer(Modifier.width(AlphaButtonSize.Compact.iconSpacing))
-                                    Text(stringResource(if (remote.afRequested) R.string.remote_product_release_af else R.string.control_af_half_press))
+                                AlphaTonalButton(
+                                    onClick = viewModel::toggleAfLock,
+                                    enabled = canStart,
+                                    size = AlphaButtonSize.Large,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Rounded.CenterFocusStrong, null, Modifier.size(AlphaButtonSize.Large.iconSize))
+                                    Spacer(Modifier.width(AlphaButtonSize.Large.iconSpacing))
+                                    Text(
+                                        stringResource(if (remote.afRequested) R.string.remote_product_release_af else R.string.control_af_half_press),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
-                                AlphaTonalButton(onClick = { viewModel.toggleMovieRecording() }, enabled = canStart, size = AlphaButtonSize.Compact) {
-                                    Icon(Icons.Rounded.Videocam, null, Modifier.size(AlphaButtonSize.Compact.iconSize))
-                                    Spacer(Modifier.width(AlphaButtonSize.Compact.iconSpacing))
-                                    Text(stringResource(when (remote.recording) {
-                                        true -> R.string.remote_modes_movie_stop
-                                        false -> R.string.remote_modes_movie_start
-                                        null -> R.string.control_video_toggle
-                                    }))
+                                AlphaTonalButton(
+                                    onClick = { viewModel.toggleMovieRecording() },
+                                    enabled = canStart,
+                                    size = AlphaButtonSize.Large,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Rounded.Videocam, null, Modifier.size(AlphaButtonSize.Large.iconSize))
+                                    Spacer(Modifier.width(AlphaButtonSize.Large.iconSpacing))
+                                    Text(
+                                        stringResource(when (remote.recording) {
+                                            true -> R.string.remote_modes_movie_stop
+                                            false -> R.string.remote_modes_movie_start
+                                            null -> R.string.control_video_toggle
+                                        }),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
                             }
                             if (remote.cameraFocusAcquired == true) Text(stringResource(R.string.remote_product_focused),
@@ -254,7 +317,7 @@ fun RemoteShutterScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
                         if (remote.releaseUnconfirmed) Text(stringResource(R.string.remote_modes_release_warning),
                             style = MaterialTheme.typography.bodyMedium)
                     }
-                    if (mode != RemoteShootingMode.SINGLE) RemoteNoticeCard {
+                    if (activeTopMode == RemoteTopMode.TIMED) RemoteNoticeCard {
                         Text(stringResource(R.string.remote_product_foreground), style = MaterialTheme.typography.bodyMedium)
                         Text(stringResource(R.string.remote_product_foreground_caution), style = MaterialTheme.typography.bodySmall)
                     }

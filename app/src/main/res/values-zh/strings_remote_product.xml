@@ -4,9 +4,15 @@
     <string name="remote_product_burst">连拍</string>
     <string name="remote_product_bulb">B 门</string>
     <string name="remote_product_interval">间隔</string>
+    <string name="remote_product_mode_standard">标准遥控</string>
+    <string name="remote_product_mode_timed">定时拍摄</string>
+    <string name="remote_product_bulb_timed_title">B 门长曝光</string>
+    <string name="remote_product_interval_title">间隔拍摄</string>
+    <string name="remote_product_shutter_standard">快门</string>
     <string name="remote_product_hold_mode">长按</string>
     <string name="remote_product_timer_mode">定时</string>
     <string name="remote_product_connected">蓝牙已联机</string>
+    <string name="remote_product_standard_hint">短按单张拍照，按住连续拍摄（相机需设为连拍驱动）。支持半按对焦与录像。</string>
     <string name="remote_product_single_hint">请开启机身蓝牙遥控。驱动和曝光参数仍由相机设置决定。</string>
     <string name="remote_product_burst_hint">请在机身选择连续拍摄驱动。按住快门连拍，松手停止，速度由相机决定。</string>
     <string name="remote_product_bulb_hint">请在机身设为 M／BULB，使用兼容快门和驱动，并关闭机身 BULB 定时器。长按开始曝光，松手发送结束按键；定时按计划结束。应用不会更改机身设置。</string>

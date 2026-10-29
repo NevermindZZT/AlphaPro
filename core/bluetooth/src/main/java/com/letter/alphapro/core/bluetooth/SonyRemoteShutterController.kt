@@ -114,6 +114,37 @@ class SonyRemoteShutterController(
     }
 
     /**
+     * Unified shutter: sends 07, waits 150 ms, then sends 09.
+     * If [releaseRequested] is true before or during 09 (a quick tap), holds 09 for at least
+     * [minFullPressMillis] (default 150 ms) before releasing 08/50 ms/06, completing a clean single shot.
+     * If the user continues to hold, awaits [awaitRelease] before releasing, allowing continuous shooting.
+     */
+    suspend fun captureUnified(
+        releaseRequested: () -> Boolean,
+        awaitRelease: suspend () -> Unit,
+        minFullPressMillis: Long = 150L,
+        onHeld: () -> Unit = {}
+    ): Boolean = remoteAction { session ->
+        captureLocked(
+            session = session,
+            holdMillis = 0L,
+            onHeld = onHeld,
+            shouldSkipFull = null,
+            holdAction = {
+                val fullPressStarted = clockMillis()
+                if (!releaseRequested()) {
+                    awaitRelease()
+                }
+                val elapsed = clockMillis() - fullPressStarted
+                val remaining = minFullPressMillis - elapsed
+                if (remaining > 0) {
+                    wait(remaining)
+                }
+            }
+        )
+    }
+
+    /**
      * Bluetooth BULB is latched, not a held key: submit a complete start pulse, then a complete
      * end pulse on release/deadline. The camera must already be configured for Bluetooth BULB.
      * Acceptance owns the gesture, but does not confirm a physical exposure or a saved file.

@@ -527,7 +527,8 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /** Returns a per-gesture ownership token; a stale finger-up cannot stop a newer operation. */
-    fun pressBurst(): Long? = beginRemotePress(RemoteOperationMode.BURST)
+    fun pressShutter(): Long? = beginRemotePress(RemoteOperationMode.BURST)
+    fun pressBurst(): Long? = pressShutter()
     fun pressBulb(): Long? = beginRemotePress(RemoteOperationMode.BULB)
 
     private fun beginRemotePress(mode: RemoteOperationMode): Long? {
@@ -543,7 +544,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                     withTimeout(3_600_000L) { press.signal.await() }
                 }
                 if (mode == RemoteOperationMode.BURST) {
-                    shutterController.holdShutterUntilReleased(
+                    shutterController.captureUnified(
                         releaseRequested = { press.signal.isCompleted }, awaitRelease = waitForRelease,
                         onHeld = ::markRemoteRunning)
                 } else {
@@ -565,8 +566,11 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     fun releaseRemotePress(token: Long) {
         val press = activeRemotePress?.takeIf { it.token == token } ?: return
         press.signal.complete(Unit)
-        // Before full-press acceptance, cancel queue waiting rather than firing after finger-up.
-        if (!_remoteShooting.value.shutterPressAccepted) stopRemoteShooting()
+        // For BULB manual hold, an early release during half-down aborts before starting exposure.
+        // For unified shutter (BURST), an early release is a quick tap: captureUnified finishes the single-shot pulse.
+        if (_remoteShooting.value.mode != RemoteOperationMode.BURST && !_remoteShooting.value.shutterPressAccepted) {
+            stopRemoteShooting()
+        }
     }
 
     private fun freshShutterActivity(session: Any?, baseline: Long): Boolean? =

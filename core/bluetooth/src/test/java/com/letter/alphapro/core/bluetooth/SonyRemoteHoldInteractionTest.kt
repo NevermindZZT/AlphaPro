@@ -370,4 +370,48 @@ class SonyRemoteHoldInteractionTest {
             assertTrue(h.controller.halfPressAfUp())
         }
     }
+
+    @Test fun captureUnifiedEarlyReleaseProducesIdenticalSingleShotSequence() = runBlocking {
+        val h = Harness()
+        var released = false
+        h.onWait = { if (it == 150L) released = true }
+        var heldSignalled = 0
+        assertTrue(h.controller.captureUnified(
+            releaseRequested = { released },
+            awaitRelease = { error("Must not await release on early release") },
+            onHeld = { heldSignalled++ }
+        ))
+        assertEquals(1, heldSignalled)
+        assertEquals(pulse, h.codes())
+        assertEquals(listOf(0L, 150L, 300L, 350L), h.writes.map { it.at })
+        assertEquals(listOf(150L, 150L, 50L), h.waits)
+    }
+
+    @Test fun captureUnifiedSustainedHoldMaintainsFullPressUntilReleased() = runBlocking {
+        for (heldFor in listOf(0L, 37L, 500L, 4_000L)) {
+            val h = Harness()
+            val release = CompletableDeferred<Unit>()
+            var heldSignalled = 0
+            var result = false
+            val job = launch(start = CoroutineStart.UNDISPATCHED) {
+                result = h.controller.captureUnified(
+                    releaseRequested = { false },
+                    awaitRelease = { release.await() },
+                    onHeld = { heldSignalled++ }
+                )
+            }
+            assertEquals(1, heldSignalled)
+            assertEquals(listOf(7, 9), h.codes())
+            assertEquals(listOf(150L), h.waits)
+            h.now += heldFor
+            release.complete(Unit)
+            job.join()
+            assertTrue(result)
+            assertEquals(pulse, h.codes())
+            val expectedWait = if (heldFor < 150L) 150L - heldFor else 0L
+            val expectedReleaseAt = 150L + heldFor + expectedWait
+            assertEquals(expectedReleaseAt, h.writes[2].at)
+            assertEquals(expectedReleaseAt + 50L, h.writes[3].at)
+        }
+    }
 }

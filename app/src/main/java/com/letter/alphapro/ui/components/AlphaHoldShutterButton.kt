@@ -55,11 +55,13 @@ fun AlphaHoldShutterButton(
     active: Boolean = false,
     actionLabel: String,
     stateLabel: String,
+    onTap: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val latestOnPress by rememberUpdatedState(onPress)
     val latestOnRelease by rememberUpdatedState(onRelease)
     val latestOnStop by rememberUpdatedState(onStop)
+    val latestOnTap by rememberUpdatedState(onTap)
     val latestActive by rememberUpdatedState(active)
     val latestEnabled by rememberUpdatedState(enabled)
     val interactions = remember { MutableInteractionSource() }
@@ -94,6 +96,9 @@ fun AlphaHoldShutterButton(
                         } finally {
                             latestOnStop()
                         }
+                        true
+                    } else if (latestOnTap != null) {
+                        latestOnTap?.invoke()
                         true
                     } else {
                         // A timed/remote stop may have ended an earlier accessibility session.
