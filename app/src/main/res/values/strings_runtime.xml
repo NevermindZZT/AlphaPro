@@ -21,6 +21,7 @@
     <string name="runtime_export_complete">%1$s exported</string>
     <string name="runtime_export_progress">Exporting %1$s</string>
     <string name="runtime_export_failed">Export failed: %1$s</string>
+    <string name="runtime_heif_decoder_unavailable">This build has no working HIF software decoder. JPEG conversion is unavailable; choose Original HIF to export the unchanged file.</string>
     <string name="runtime_unknown_error">Unknown error</string>
     <string name="runtime_ftp_started">FTP tethering started: %1$s:%2$d</string>
     <string name="runtime_ftp_stopped">FTP service stopped</string>

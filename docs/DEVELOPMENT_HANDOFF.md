@@ -229,4 +229,17 @@ git diff --check
 - 未连接 Android 真机进行本轮验证，13 项可选 Android 运行时测试未启用。请在原崩溃设备连续记录至少3分钟（跨多次60秒保存）、前后台切换、停止/重启GPS服务，并从设置分享GPX给接收应用检查可读；关闭GPX应不再新增点但相机GPS继续同步。无需清除应用数据，不要求重新授予公共存储权限。
 - 用户随后回复“OK, 提交改动”，概括验收 G1 并明确授权本轮本地提交；不视为上述设备、系统分享或失败路径已逐项覆盖。未授权推送、修改标签或更新正式 Release。
 
+## HIF 导出 JNI 崩溃修复 H1（2026-10-29，已获用户提交确认）
+
+- 用户日志为 `UnsatisfiedLinkError`：默认构建此前关闭 NDK，APK 不含 alpha_heif.so；加载失败被忽略，随后无条件调用 external decodeFile。ViewModel 的 Exception 捕获不覆盖 LinkageError。不能诊断为用户照片损坏，也不能将系统 HEIF 解码当作 Sony 10-bit 4:2:2 的可靠替代。
+- 已补齐 NDK26.1.10909125/CMake3.22.1；最初磁盘不足且 NDK 仅有旧安装残留，后续可用空间回升后安装、真实交叉编译成功。默认启用原生构建，只有明确 `-PnativeHeif=false` 才省略解码器；修复 JNI 旧包名转发到未声明函数的问题，native* 实现直接导出当前包名方法，并补 consumer keep 规则。
+- 所有原生解码/EXIF入口经 NativeHeifRuntime，缺库/符号缺失转可恢复 IOException，已知解码分配OOM也转错误而不自动重试；不广泛吞掉其他VM错误/取消。不可用时下载前拦截，导出面板默认原始HIF并禁用JPEG，提供双语提示；不偷偷将用户请求的JPEG替换成HIF。
+- JPEG转换串行，传入协程取消检查，缓存文件取消交接安全清理。补上原先缺失的相册发布：只有JPEG实际写入并发布MediaStore后才提示成功；失败删除未完成条目。不再把仅生成缓存文件当作导出完成。
+- 三ABI arm64-v8a/armeabi-v7a/x86_64 全部原生编译成功，最终默认构建APK含9个.so（alpha_heif/heif/de265各三份）。新增 `scripts/check-heif-apk.py` 检查架构、4个JNI导出、依赖闭合、16KB ELF LOAD对齐和压缩提取打包；AGP8.4使用useLegacyPackaging避免直接mmap未对齐ZIP条目。此为静态产物验证，不等于真机已加载解码成功。
+- 最终离线Release/签名v2/v3通过，244项默认JVM结果通过（app50/Bluetooth124/PTP48/location13/heif9）；424键双语、74处/15文件UI契约、差异检查通过。9项新增测试针对缺库/符号/预检/并发加载/IO/取消/OOM，不是实际Sony样片解码。13项可选Android运行时用例未运行。
+- 测试包 `app/build/outputs/apk/release/AlphaPro-1.0.0.18-hif-native-H1.apk`，16,959,541字节，SHA256 `a9fc8f18f48772debea91cc5f882331fd53ef022b7475a1944398fc173bc352d`。需原崩溃设备验证JPEG实际出现在相册、可重开、颜色/方向/EXIF及原始HIF导出；本轮无Android设备或用户Sony样片，不宣称实际解码和色彩全覆盖。
+- JPEG为有损8-bit，EXIF仅标签白名单，512MiB原生预算仍限制超高像素（约44.7MP以上）；61MP、EXIF-only旋转、HDR/广色域保真需后续样片验证/改造，不能继续宣传“无损JPEG/全部EXIF”。README已修正文案，细节见 `HIF_EXPORT_REVIEW.md`。新增库依赖遵循各自上游许可证，未来正式分发需保留相应许可与源码可获取性。
+- 用户随后明确要求只保留 `arm64-v8a`，去掉 `armeabi-v7a/x86_64`。已在app打包和heif编译双层过滤；APK守卫要求唯一ABI为arm64并拒绝额外ABI。以上三ABI证据为初版历史，不再代表当前配置。仅ABI调整后重建Release/签名/产物检查通过，APK确实仅含三个arm64库；既有244项JVM结果保留为基线，本次未重新运行。最新包 `app/build/outputs/apk/release/AlphaPro-1.0.0.18-hif-native-H1-arm64.apk`，14,219,809字节，SHA256 `f3952b8ca9e28b03773cfcd45a6da5129a3e9b8188c78c47fdd88f88a04126f0`。
+- 用户随后回复“提交改动”，授权H1及arm64调整一并本地提交；未授权推送、修改标签或正式Release。该请求未额外提供逐项真机转换/色彩验证证据，上述验证限制保留。
+
 协议细节/设备清单见 `REMOTE_CONTROL_REVIEW.md`；公共UI尺寸和配色见 `UI_COMPONENTS.md`；本地化见 `LOCALIZATION.md`。

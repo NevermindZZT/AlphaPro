@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -92,17 +93,77 @@ class PtpPhotoDownloader(
         }
     }.flowOn(Dispatchers.IO)
 
+    /** Publish a completed conversion, deleting an incomplete MediaStore row on failure/cancel. */
+    suspend fun publishJpeg(file: File, displayName: String, folderName: String = "AlphaPro"): Uri =
+        withContext(Dispatchers.IO) {
+            val resolver = context.contentResolver
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, File(displayName).name)
+                put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/" + folderName)
+                    put(MediaStore.MediaColumns.IS_PENDING, 1)
+                }
+            }
+            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                ?: throw java.io.IOException("Cannot create JPEG in MediaStore")
+            var complete = false
+            try {
+                val output = resolver.openOutputStream(uri)
+                    ?: throw java.io.IOException("Cannot open JPEG destination")
+                output.use { destination ->
+                    file.inputStream().use { input ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (true) {
+                            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                            val size = input.read(buffer)
+                            if (size < 0) break
+                            destination.write(buffer, 0, size)
+                        }
+                    }
+                    destination.flush()
+                }
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val published = resolver.update(uri, ContentValues().apply {
+                        put(MediaStore.MediaColumns.IS_PENDING, 0)
+                    }, null, null)
+                    if (published < 1) throw java.io.IOException("Cannot publish JPEG in MediaStore")
+                }
+                complete = true
+                uri
+            } finally {
+                if (!complete) {
+                    try { resolver.delete(uri, null, null) } catch (_: Exception) { /* preserve original failure */ }
+                }
+            }
+        }
+
     suspend fun downloadToTempFile(
         metadata: PtpImageMetadata,
         onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit = { _, _ -> }
-    ): File = withContext(Dispatchers.IO) {
-        val tempFile = File.createTempFile("alphapro_", "_" + metadata.filename, context.cacheDir)
-        FileOutputStream(tempFile).use { out ->
-            downloadStream(metadata, out) { downloaded ->
-                onProgress(downloaded, metadata.fileSize)
+    ): File {
+        var tempFile: File? = null
+        var delivered = false
+        try {
+            val downloaded = withContext(Dispatchers.IO) {
+                val file = File.createTempFile("alphapro_", "_" + metadata.filename, context.cacheDir)
+                tempFile = file
+                FileOutputStream(file).use { out ->
+                    downloadStream(metadata, out) { size ->
+                        onProgress(size, metadata.fileSize)
+                    }
+                }
+                file
+            }
+            // Only transfer ownership after withContext's cancellable return succeeds.
+            delivered = true
+            return downloaded
+        } finally {
+            if (!delivered) withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                tempFile?.delete()
             }
         }
-        tempFile
     }
 
     private suspend fun downloadStream(

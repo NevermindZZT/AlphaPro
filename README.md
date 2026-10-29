@@ -24,7 +24,7 @@
 2. **专业相册浏览与 10-bit HEIF 导出**
    - **RAW + JPG / HIF 智能归并**：机内双格式拍摄同名文件自动聚合成单张照片卡片，直观显示 `RAW + 10b HIF` 醒目角标。
    - **全屏沉浸式检焦看图**：点击相片仅打开全屏高清黑色画廊，支持双指平滑放大、双击放大检焦、平移细节，绝不误触下载。
-   - **下载格式决策**：下载时智能询问用户导出策略——可选择“仅下载渲染图”、“仅下载 RAW 原片”或“同时归档双格式”；内置 NDK `libde265` 多核软解，支持一键无损将 10-bit 4:2:2 HEIF 转码为 95% 通用高质量 JPEG 并完整继承全部 EXIF 拍摄参数。
+   - **下载格式决策**：可选择渲染图、RAW 原片或双格式归档，也可直接下载未转换的原始 HIF。默认构建启用 `libheif` + `libde265` 软件解码器，仅编译和打包 `arm64-v8a`，需要 NDK 26.1.10909125 和 CMake 3.22.1。`-PnativeHeif=false` 仅用于显式无原生库构建，此时 JPEG 转换不可用并提示使用原始 HIF。仍需实际验证机型、ABI、颜色和导出流程。JPEG 是有损 8-bit 输出，代码只复制部分 EXIF 标签，不承诺保留全部 EXIF、HDR 或 10-bit 信息。
 3. **免密高速 Wi-Fi 直连**
    - 蓝牙自动协商提取凭据，通过 Android `WifiNetworkSpecifier` 在应用内秒级直连相机 5GHz/2.4GHz Wi-Fi 热点。
    - 套接字强制绑定相机局域网，彻底不受手机 5G/4G 蜂窝数据劫持干扰。
@@ -76,7 +76,7 @@ AlphaPro/
 │   └── ui/settings/      # 独立设置 Activity、主题莫奈色彩、版本与 GitHub 仓库入口
 ├── core/bluetooth/       # 索尼 BLE 握手协议、95/91 字节坐标封包、CC13 对时、快门/录像指令
 ├── core/ptp/             # PTP/IP 端口 15740 双套接字、Sony Content Catalog 0x923c 目录、断点分块流
-├── core/heif/            # 10-bit 4:2:2 HEIF 软解引擎、EXIF 完整保留、Coil 加载器
+├── core/heif/            # HEIF 软件解码、部分 EXIF 复制、JNI 可用性保护、Coil 加载器
 ├── core/location/        # 自适应高精度定位、防漂移滤波、离线 GPX 轨迹记录
 ├── core/ftp/             # 本地轻量级 FTP 边拍边传服务器 (即拍即显)
 └── keystore/             # 4096 位通用正式签名密钥库与使用说明

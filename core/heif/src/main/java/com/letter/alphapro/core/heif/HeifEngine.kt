@@ -3,6 +3,7 @@ package com.letter.alphapro.core.heif
 import android.graphics.Bitmap
 import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -10,30 +11,39 @@ import java.io.IOException
 import java.util.function.BooleanSupplier
 
 object HeifDecoder {
-    init {
-        try {
-            System.loadLibrary("alpha_heif")
-        } catch (_: UnsatisfiedLinkError) {
-            // In unit test or environment without native library
-        }
-    }
+    private val runtime = NativeHeifRuntime { System.loadLibrary("alpha_heif") }
+
+    val isAvailable: Boolean get() = runtime.isAvailable
+
+    fun requireAvailable() = runtime.requireAvailable()
 
     @JvmStatic
     fun createBitmap(width: Int, height: Int): Bitmap {
         return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     }
 
-    @JvmStatic
-    external fun decodeFile(path: String, memoryBudget: Long, cancelled: BooleanSupplier? = null): Bitmap
+    fun decodeFile(path: String, memoryBudget: Long, cancelled: BooleanSupplier? = null): Bitmap =
+        runtime.call { nativeDecodeFile(path, memoryBudget, cancelled) }
+
+    fun decodeThumbnail(encoded: ByteArray, memoryBudget: Long): Bitmap =
+        runtime.call { nativeDecodeThumbnail(encoded, memoryBudget) }
+
+    fun decodePreview(encoded: ByteArray, memoryBudget: Long): Bitmap =
+        runtime.call { nativeDecodePreview(encoded, memoryBudget) }
+
+    fun readExif(path: String): ByteArray = runtime.call { nativeReadExif(path) }
 
     @JvmStatic
-    external fun decodeThumbnail(encoded: ByteArray, memoryBudget: Long): Bitmap
+    private external fun nativeDecodeFile(path: String, memoryBudget: Long, cancelled: BooleanSupplier?): Bitmap
 
     @JvmStatic
-    external fun decodePreview(encoded: ByteArray, memoryBudget: Long): Bitmap
+    private external fun nativeDecodeThumbnail(encoded: ByteArray, memoryBudget: Long): Bitmap
 
     @JvmStatic
-    external fun readExif(path: String): ByteArray
+    private external fun nativeDecodePreview(encoded: ByteArray, memoryBudget: Long): Bitmap
+
+    @JvmStatic
+    private external fun nativeReadExif(path: String): ByteArray
 }
 
 class HeifTranscoder {
@@ -78,10 +88,14 @@ class HeifTranscoder {
         targetJpegFile: File,
         quality: Int = 95
     ): File = withContext(Dispatchers.IO) {
-        val memoryBudget = 512L * 1024 * 1024 // 512MB decoding budget
-        val bitmap = HeifDecoder.decodeFile(sourceHifFile.absolutePath, memoryBudget)
+        require(quality in 1..100)
+        val memoryBudget = 512L * 1024 * 1024 // libheif budget, not a total process memory cap
+        val job = kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]
+        val bitmap = HeifDecoder.decodeFile(sourceHifFile.absolutePath, memoryBudget,
+            BooleanSupplier { job?.isActive == false })
 
         try {
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
             FileOutputStream(targetJpegFile).use { out ->
                 val compressed = bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
                 if (!compressed) throw IOException("Failed to compress bitmap to JPEG")
@@ -90,6 +104,8 @@ class HeifTranscoder {
             // Copy metadata
             copyExifMetadata(sourceHifFile, targetJpegFile, bitmap.width, bitmap.height)
             targetJpegFile
+        } catch (failure: OutOfMemoryError) {
+            throw IOException("Insufficient memory for JPEG conversion", failure)
         } finally {
             bitmap.recycle()
         }

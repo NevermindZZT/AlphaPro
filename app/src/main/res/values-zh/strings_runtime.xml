@@ -21,6 +21,7 @@
     <string name="runtime_export_complete">%1$s 导出完成</string>
     <string name="runtime_export_progress">正在导出 %1$s</string>
     <string name="runtime_export_failed">导出失败：%1$s</string>
+    <string name="runtime_heif_decoder_unavailable">当前安装包缺少可用的 HIF 软件解码器，无法转为 JPEG；请选择“原始 HIF”导出未转换的原文件。</string>
     <string name="runtime_unknown_error">未知异常</string>
     <string name="runtime_ftp_started">FTP 边拍边传已启动：%1$s:%2$d</string>
     <string name="runtime_ftp_stopped">FTP 服务已停止</string>

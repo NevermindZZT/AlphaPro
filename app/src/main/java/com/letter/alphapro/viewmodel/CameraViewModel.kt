@@ -24,6 +24,8 @@ import com.letter.alphapro.wifi.CameraWifiSpecifierConnector
 import com.letter.alphapro.wifi.CameraWifiState
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -61,6 +63,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     val ptpClient = PtpIpClient()
     val ptpDownloader = PtpPhotoDownloader(application, ptpClient)
     val heifTranscoder = HeifTranscoder()
+    private val heifExportMutex = Mutex()
     private val bleScanner = SonyBleScanner(application, messageContext = { AppLanguage.localizedContext(application) })
 
     private val ftpStorageDir = File(application.getExternalFilesDir(null), "tether_ftp").apply { mkdirs() }
@@ -368,11 +371,24 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
             _uiState.update { it.copy(userNotice = text(R.string.runtime_export_starting, metadata.filename)) }
             try {
                 if (transcodeToJpeg && metadata.isHeif) {
-                    val tempHeif = ptpDownloader.downloadToTempFile(metadata)
-                    val targetJpeg = File(tempHeif.parentFile, metadata.filename.substringBeforeLast(".") + ".jpg")
-                    heifTranscoder.transcodeHeifToJpeg(tempHeif, targetJpeg, jpegQuality)
-                    tempHeif.delete()
-                    _uiState.update { it.copy(userNotice = text(R.string.runtime_export_transcoded, metadata.filename, jpegQuality)) }
+                    com.letter.alphapro.core.heif.HeifDecoder.requireAvailable()
+                    heifExportMutex.withLock {
+                        val tempHeif = ptpDownloader.downloadToTempFile(metadata)
+                        var targetJpeg: File? = null
+                        try {
+                            val jpeg = withContext(Dispatchers.IO) {
+                                File.createTempFile("alphapro_jpeg_", ".jpg", tempHeif.parentFile).also { targetJpeg = it }
+                            }
+                            heifTranscoder.transcodeHeifToJpeg(tempHeif, jpeg, jpegQuality)
+                            ptpDownloader.publishJpeg(jpeg, File(metadata.filename).name.substringBeforeLast(".") + ".jpg")
+                            _uiState.update { it.copy(userNotice = text(R.string.runtime_export_transcoded, metadata.filename, jpegQuality)) }
+                        } finally {
+                            withContext(NonCancellable + Dispatchers.IO) {
+                                tempHeif.delete()
+                                targetJpeg?.delete()
+                            }
+                        }
+                    }
                 } else {
                     ptpDownloader.downloadToMediaStore(metadata).collect { progress ->
                         _uiState.update { current ->
@@ -385,6 +401,10 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                         }
                     }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: com.letter.alphapro.core.heif.HeifDecoderUnavailableException) {
+                _uiState.update { it.copy(userNotice = text(R.string.runtime_heif_decoder_unavailable)) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(userNotice = text(R.string.runtime_export_failed, e.message ?: text(R.string.runtime_unknown_error))) }
             }

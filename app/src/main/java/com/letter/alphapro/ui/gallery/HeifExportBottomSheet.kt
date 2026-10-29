@@ -35,7 +35,8 @@ fun HeifExportBottomSheet(
     onDismissRequest: () -> Unit,
     onStartExport: (HeifExportMode, Int) -> Unit
 ) {
-    var selectedMode by remember { mutableStateOf(HeifExportMode.TRANSCODE_JPEG) }
+    val decoderAvailable = remember { com.letter.alphapro.core.heif.HeifDecoder.isAvailable }
+    var selectedMode by remember { mutableStateOf(if (decoderAvailable) HeifExportMode.TRANSCODE_JPEG else HeifExportMode.ORIGINAL_HIF) }
     var jpegQuality by remember { mutableStateOf(95f) }
     val locale = LocalConfiguration.current.locales[0]
     val percentFormat = remember(locale) { NumberFormat.getPercentInstance(locale) }
@@ -68,9 +69,10 @@ fun HeifExportBottomSheet(
             ExportOptionCard(
                 icon = Icons.Rounded.Transform,
                 title = stringResource(R.string.gallery_export_jpeg_title),
-                subtitle = stringResource(R.string.gallery_export_jpeg_description),
+                subtitle = stringResource(if (decoderAvailable) R.string.gallery_export_jpeg_description else R.string.runtime_heif_decoder_unavailable),
                 badge = stringResource(R.string.gallery_badge_share),
                 selected = selectedMode == HeifExportMode.TRANSCODE_JPEG,
+                enabled = decoderAvailable,
                 onClick = { selectedMode = HeifExportMode.TRANSCODE_JPEG }
             ) {
                 if (selectedMode == HeifExportMode.TRANSCODE_JPEG) {
@@ -137,6 +139,7 @@ private fun ExportOptionCard(
     badge: String,
     selected: Boolean,
     onClick: () -> Unit,
+    enabled: Boolean = true,
     content: @Composable () -> Unit = {}
 ) {
     Surface(
@@ -145,11 +148,11 @@ private fun ExportOptionCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = selected, onClick = onClick)
+                RadioButton(selected = selected, onClick = onClick, enabled = enabled)
                 Spacer(modifier = Modifier.width(8.dp))
                 Icon(imageVector = icon, contentDescription = null, tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.width(8.dp))

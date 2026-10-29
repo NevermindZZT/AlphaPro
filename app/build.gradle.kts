@@ -69,6 +69,9 @@ android {
         targetSdk = 37
         versionCode = computedVersionCode
         versionName = computedVersionName
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -120,6 +123,9 @@ android {
         }
     }
     packaging {
+        // AGP 8.4 cannot guarantee 16KB ZIP alignment for mmap-loaded native libraries.
+        // Compress/extract them; each decoder ELF is separately linked with 16KB LOAD alignment.
+        jniLibs.useLegacyPackaging = true
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }

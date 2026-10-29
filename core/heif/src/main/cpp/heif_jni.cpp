@@ -153,30 +153,7 @@ private:
 }
 
 extern "C" JNIEXPORT jobject JNICALL
-Java_com_letter_alphapro_core_heif_HeifDecoder_decodeFile(JNIEnv* env, jclass decoder, jstring path,
-                                                       jlong memoryBudget, jobject callback) {
-    return Java_com_sasch_cameragps_heif_HeifDecoder_decodeFile(env, decoder, path, memoryBudget, callback);
-}
-
-extern "C" JNIEXPORT jobject JNICALL
-Java_com_letter_alphapro_core_heif_HeifDecoder_decodeThumbnail(JNIEnv* env, jclass decoder, jbyteArray encoded,
-                                                            jlong memoryBudget) {
-    return Java_com_sasch_cameragps_heif_HeifDecoder_decodeThumbnail(env, decoder, encoded, memoryBudget);
-}
-
-extern "C" JNIEXPORT jobject JNICALL
-Java_com_letter_alphapro_core_heif_HeifDecoder_decodePreview(JNIEnv *env, jclass decoder, jbyteArray encoded,
-                                                          jlong memoryBudget) {
-    return Java_com_sasch_cameragps_heif_HeifDecoder_decodePreview(env, decoder, encoded, memoryBudget);
-}
-
-extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_letter_alphapro_core_heif_HeifDecoder_readExif(JNIEnv* env, jclass clazz, jstring path) {
-    return Java_com_sasch_cameragps_heif_HeifDecoder_readExif(env, clazz, path);
-}
-
-extern "C" JNIEXPORT jobject JNICALL
-Java_com_sasch_cameragps_heif_HeifDecoder_decodeFile(JNIEnv* env, jclass decoder, jstring path,
+Java_com_letter_alphapro_core_heif_HeifDecoder_nativeDecodeFile(JNIEnv* env, jclass decoder, jstring path,
                                                   jlong memoryBudget, jobject callback) {
     return protect(env, [&]() -> jobject {
         // Guard the signed Java value before converting to the decoder's uint64_t.
@@ -195,7 +172,7 @@ Java_com_sasch_cameragps_heif_HeifDecoder_decodeFile(JNIEnv* env, jclass decoder
 }
 
 extern "C" JNIEXPORT jobject JNICALL
-Java_com_sasch_cameragps_heif_HeifDecoder_decodeThumbnail(JNIEnv* env, jclass decoder, jbyteArray encoded,
+Java_com_letter_alphapro_core_heif_HeifDecoder_nativeDecodeThumbnail(JNIEnv* env, jclass decoder, jbyteArray encoded,
                                                        jlong memoryBudget) {
     return protect(env, [&] {
         return decodeMemory(env, decoder, encoded, memoryBudget, 512 * 1024, 640);
@@ -203,7 +180,7 @@ Java_com_sasch_cameragps_heif_HeifDecoder_decodeThumbnail(JNIEnv* env, jclass de
 }
 
 extern "C" JNIEXPORT jobject JNICALL
-Java_com_sasch_cameragps_heif_HeifDecoder_decodePreview(JNIEnv *env, jclass decoder, jbyteArray encoded,
+Java_com_letter_alphapro_core_heif_HeifDecoder_nativeDecodePreview(JNIEnv *env, jclass decoder, jbyteArray encoded,
         jlong memoryBudget) {
     return protect(env, [&] {
         return decodeMemory(env, decoder, encoded, memoryBudget, 8 * 1024 * 1024, 2048);
@@ -211,7 +188,7 @@ Java_com_sasch_cameragps_heif_HeifDecoder_decodePreview(JNIEnv *env, jclass deco
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_sasch_cameragps_heif_HeifDecoder_readExif(JNIEnv* env, jclass, jstring path) {
+Java_com_letter_alphapro_core_heif_HeifDecoder_nativeReadExif(JNIEnv* env, jclass, jstring path) {
     return protect(env, [&]() -> jbyteArray {
         UtfChars filename(env, path);
         if (env->ExceptionCheck()) return nullptr;
