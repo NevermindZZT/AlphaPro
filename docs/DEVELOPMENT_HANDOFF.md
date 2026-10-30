@@ -326,4 +326,12 @@ git diff --check
 - 提交前重新通过脚本语法、本地化434键/UI79处检查，并复核现存283项默认JVM报告无失败；`.gradle/h4-evidence`中的7项运行时报告临时副本已不在原路径。本次不重新运行该7项，沿用此前本会话实际执行的通过记录及已版本化测试源码，不将其称为本轮重跑。
 - 同轮一并纳入工作区已有的构建环境调整：`build.sh`优先使用JAVA_HOME/ANDROID_HOME环境变量并不再强制工作区Gradle/Android用户目录，`gradle.properties`移除固定的本机user.home；已检查差异，未纳入SDK、密钥、APK或其他生成产物。
 
+## v1.0.1 版本发布（2026-10-30，经用户明确指令）
+
+- 用户明确要求“更新版本号到 1.0.1 提交推送发布”。
+- `app/build.gradle.kts` 将 `versionPatch` 更新为 1，`README.md` 徽章更新为 1.0.1，生成 `docs/releases/v1.0.1.md`。
+- 本地提交本次版本更新，提交计数递增为 22，生成正式发布包 `AlphaPro-v1.0.1.apk`（内部版本号 `1.0.1.22`，versionCode `100010022`）。
+- 包含从 v1.0.0 到 v1.0.1 期间经用户实测验收并授权的全部成果：使用引导与设置回看、预测性返回手势、后台定位/电池优化设置向导、无线快门简化与按键优化、GPX 轨迹私有存储隔离与异常保护、ARM64 原生 10-bit HEIF 软件解码器、相册系统优先与会话安全恢复、大图滑动翻页多选、下载弹窗排版优化等。
+- 经由 GitHub 官方 Git Database API 同步提交树、附注标签 `v1.0.1` 并更新远程 `refs/heads/main`，经 `gh release create` 上传附件并完成正式 GitHub Release。
+
 协议细节/设备清单见 `REMOTE_CONTROL_REVIEW.md`；公共UI尺寸和配色见 `UI_COMPONENTS.md`；本地化见 `LOCALIZATION.md`。

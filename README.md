@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/NevermindZZT/AlphaPro"><img src="https://img.shields.io/badge/GitHub-NevermindZZT%2FAlphaPro-181717.svg?style=flat-square&logo=github" alt="GitHub Repo" /></a>
-  <a href="https://github.com/NevermindZZT/AlphaPro/releases"><img src="https://img.shields.io/badge/version-1.0.0-orange.svg?style=flat-square" alt="Version" /></a>
+  <a href="https://github.com/NevermindZZT/AlphaPro/releases"><img src="https://img.shields.io/badge/version-1.0.1-orange.svg?style=flat-square" alt="Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square" alt="License" /></a>
   <img src="https://img.shields.io/badge/Platform-Android-green.svg?style=flat-square&logo=android" alt="Platform" />
   <img src="https://img.shields.io/badge/Target%20SDK-37-blue.svg?style=flat-square" alt="Target SDK" />

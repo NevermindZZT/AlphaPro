@@ -23,7 +23,7 @@ fun getGitCommitCount(): Int {
 
 val versionMajor = 1
 val versionMinor = 0
-val versionPatch = 0
+val versionPatch = 1
 val commitCount = getGitCommitCount()
 
 val computedVersionName = "$versionMajor.$versionMinor.$versionPatch.$commitCount"
