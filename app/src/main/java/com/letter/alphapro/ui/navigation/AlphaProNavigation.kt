@@ -36,11 +36,14 @@ fun AlphaProApp(viewModel: CameraViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val remote by viewModel.remoteShooting.collectAsState()
     val viewingPhoto by viewModel.viewingPhoto.collectAsState()
+    val viewingPhotos by viewModel.viewingPhotos.collectAsState()
+    val viewingIndex by viewModel.viewingIndex.collectAsState()
     val preview by viewModel.photoPreview.collectAsState()
     val thumbnails by viewModel.thumbnails.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var downloadGroup by remember { mutableStateOf<CameraCaptureGroup?>(null) }
     var heifGroup by remember { mutableStateOf<CameraCaptureGroup?>(null) }
+    var batchExportGroups by remember { mutableStateOf<List<CameraCaptureGroup>?>(null) }
 
     LaunchedEffect(uiState.userNotice) {
         uiState.userNotice?.let { snackbarHostState.showSnackbar(it); viewModel.clearNotice() }
@@ -82,9 +85,19 @@ fun AlphaProApp(viewModel: CameraViewModel = viewModel()) {
         viewingPhoto?.let { group ->
             BackHandler(onBack = viewModel::closePhoto)
             PhotoDetailViewerScreen(
-                group = group,
-                thumbnail = thumbnails[group.visualFile.handle],
+                photos = viewingPhotos.ifEmpty { listOf(group) },
+                initialIndex = viewingIndex,
                 preview = preview,
+                selectedIds = viewModel.selectedGroupIds,
+                onToggleSelect = { target ->
+                    if (target.id in viewModel.selectedGroupIds) {
+                        viewModel.selectedGroupIds.remove(target.id)
+                    } else {
+                        viewModel.selectedGroupIds.add(target.id)
+                    }
+                },
+                onIndexChange = viewModel::setViewingIndex,
+                getThumbnail = { handle -> thumbnails[handle] },
                 onRetry = { viewModel.requestPhotoPreview(group.visualFile) },
                 onDismissRequest = viewModel::closePhoto,
                 onDownloadClick = {
@@ -94,12 +107,26 @@ fun AlphaProApp(viewModel: CameraViewModel = viewModel()) {
                         it.hasHeif -> heifGroup = it
                         else -> viewModel.exportPhoto(it.visualFile, false)
                     }
+                },
+                onBatchDownloadClick = { chosen ->
+                    viewModel.closePhoto()
+                    if (chosen.any { it.hasHeif }) {
+                        batchExportGroups = chosen
+                    } else {
+                        chosen.flatMap { it.files }.forEach { viewModel.exportPhoto(it, false) }
+                        viewModel.selectedGroupIds.clear()
+                    }
                 }
             )
         }
     }
+    val heifPolicy by viewModel.heifPolicy.collectAsState()
     downloadGroup?.let { group ->
-        GroupDownloadDialog(group, { downloadGroup = null }) { target, transcode ->
+        GroupDownloadDialog(
+            group = group,
+            defaultTranscodeHeif = heifPolicy != com.letter.alphapro.data.DefaultHeifPolicy.ORIGINAL_HIF,
+            onDismissRequest = { downloadGroup = null }
+        ) { target, transcode ->
             downloadGroup = null
             viewModel.exportCaptureGroup(group, target, transcode)
         }
@@ -108,6 +135,13 @@ fun AlphaProApp(viewModel: CameraViewModel = viewModel()) {
         HeifExportBottomSheet(1, 1, { heifGroup = null }) { mode, quality ->
             heifGroup = null
             viewModel.exportPhoto(group.visualFile, mode == HeifExportMode.TRANSCODE_JPEG, quality)
+        }
+    }
+    batchExportGroups?.let { chosen ->
+        HeifExportBottomSheet(chosen.size, chosen.count { it.hasHeif }, { batchExportGroups = null }) { mode, quality ->
+            batchExportGroups = null
+            chosen.forEach { viewModel.exportPhoto(it.visualFile, mode == HeifExportMode.TRANSCODE_JPEG && it.hasHeif, quality) }
+            viewModel.selectedGroupIds.clear()
         }
     }
 }

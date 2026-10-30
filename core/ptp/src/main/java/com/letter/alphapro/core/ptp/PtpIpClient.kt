@@ -3,10 +3,12 @@ package com.letter.alphapro.core.ptp
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.EOFException
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetSocketAddress
@@ -30,7 +32,15 @@ data class PtpImageMetadata(
 
 class PtpSessionClosedException(cause: Throwable?) : IllegalStateException("Camera session is closed", cause)
 
-class PtpIpClient {
+class PtpIpClient internal constructor(
+    private val socketTimeoutMillis: Int,
+    private val transactionTimeoutMillis: Long
+) {
+    constructor() : this(15_000, 30_000)
+
+    init {
+        require(socketTimeoutMillis > 0 && transactionTimeoutMillis > 0)
+    }
     private var cmdSocket: Socket? = null
     private var eventSocket: Socket? = null
     private var cmdIn: InputStream? = null
@@ -41,6 +51,21 @@ class PtpIpClient {
 
     private data class ConnectionTarget(val host: String, val port: Int, val network: android.net.Network?)
     private var savedTarget: ConnectionTarget? = null
+    private var targetEpoch = -1L
+    // An explicit connect/disconnect supersedes even operations already queued on the mutex.
+    // Transport recovery keeps the epoch: it still addresses the same camera intent.
+    private val sessionIntentLock = Any()
+    @Volatile private var sessionEpoch = 0L
+
+    fun captureSessionEpoch(): Long = sessionEpoch
+
+    private fun nextSessionEpoch(): Long = synchronized(sessionIntentLock) { ++sessionEpoch }
+
+    private fun requireSessionEpoch(expected: Long, requireTarget: Boolean = true) {
+        if (expected != sessionEpoch || (requireTarget && expected != targetEpoch)) {
+            throw PtpSessionClosedException(lastSessionFailure)
+        }
+    }
     @Volatile private var catalogTransferEnabled = false
     @Volatile var lastSessionFailure: Throwable? = null
         private set
@@ -50,16 +75,21 @@ class PtpIpClient {
         cameraHost: String,
         port: Int = PtpConstants.PTP_IP_PORT,
         network: android.net.Network? = null
-    ) = withContext(Dispatchers.IO) {
-        transactionMutex.withLock {
-            closeTransport()
-            catalogTransferEnabled = false
-            lastSessionFailure = null
-            val target = ConnectionTarget(cameraHost, port, network)
-            savedTarget = target
-            guardedIo {
-                connectLocked(target)
+    ) {
+        val epoch = nextSessionEpoch()
+        withContext(Dispatchers.IO) {
+            transactionMutex.withLock {
+                requireSessionEpoch(epoch, requireTarget = false)
+                closeTransport()
+                catalogTransferEnabled = false
                 lastSessionFailure = null
+                val target = ConnectionTarget(cameraHost, port, network)
+                savedTarget = target
+                targetEpoch = epoch
+                guardedIo {
+                    connectLocked(target)
+                    lastSessionFailure = null
+                }
             }
         }
     }
@@ -70,23 +100,30 @@ class PtpIpClient {
      * Does not replay ANY operation. Callers may retry an idempotent read at most once; never
      * replay remote capture, commands, property writes or data-out after an uncertain result.
      */
-    suspend fun reconnectIfNeeded(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun reconnectIfNeeded(): Boolean = reconnectIfNeeded(captureSessionEpoch())
+
+    suspend fun reconnectIfNeeded(expectedSessionEpoch: Long): Boolean = withContext(Dispatchers.IO) {
         transactionMutex.withLock {
-            if (cmdIn != null && cmdOut != null) return@withLock false
-            val target = savedTarget ?: throw PtpSessionClosedException(lastSessionFailure)
-            guardedIo {
-                closeTransport()
-                connectLocked(target)
-                if (catalogTransferEnabled) {
-                    // Restore a known, idempotent session mode, never replay the failed user operation.
-                    check(executeDataOutLocked(PtpConstants.OC_SONY_SET_PROPERTY,
-                        listOf(PtpConstants.PROP_SONY_TRANSFER_MODE.toLong(), 1L), byteArrayOf(2, 0)) == PtpConstants.RC_OK) {
-                        "Camera refused transfer-mode initialization"
-                    }
+            requireSessionEpoch(expectedSessionEpoch)
+            reconnectLocked()
+        }
+    }
+
+    private suspend fun reconnectLocked(): Boolean {
+        if (cmdIn != null && cmdOut != null) return false
+        val target = savedTarget ?: throw PtpSessionClosedException(lastSessionFailure)
+        return guardedIo {
+            closeTransport()
+            connectLocked(target)
+            if (catalogTransferEnabled) {
+                // Restore a known session mode, never replay the failed user operation.
+                check(executeDataOutLocked(PtpConstants.OC_SONY_SET_PROPERTY,
+                    listOf(PtpConstants.PROP_SONY_TRANSFER_MODE.toLong(), 1L), byteArrayOf(2, 0)) == PtpConstants.RC_OK) {
+                    "Camera refused transfer-mode initialization"
                 }
-                lastSessionFailure = null
-                true
             }
+            lastSessionFailure = null
+            true
         }
     }
 
@@ -96,7 +133,7 @@ class PtpIpClient {
         // 1. Connect Command Socket bound to camera Wi-Fi network (bypasses mobile 5G)
         val cmd = socketFactory.createSocket().also { cmdSocket = it }
         cmd.connect(InetSocketAddress(target.host, target.port), 6000)
-        cmd.soTimeout = 15000
+        cmd.soTimeout = socketTimeoutMillis
         cmdIn = cmd.getInputStream()
         cmdOut = cmd.getOutputStream()
 
@@ -117,7 +154,7 @@ class PtpIpClient {
         // 3. Connect Event Socket bound to camera Wi-Fi network
         val evt = socketFactory.createSocket().also { eventSocket = it }
         evt.connect(InetSocketAddress(target.host, target.port), 6000)
-        evt.soTimeout = 15000
+        evt.soTimeout = socketTimeoutMillis
         val evtIn = evt.getInputStream()
         val evtOut = evt.getOutputStream()
 
@@ -131,12 +168,17 @@ class PtpIpClient {
         check(executeCommandLocked(PtpConstants.OC_SONY_OPEN_EXTENDED_SESSION, listOf(1L, 2L)) == PtpConstants.RC_OK) { "Camera refused extended session" }
     }
 
-    suspend fun disconnect() = withContext(Dispatchers.IO) {
-        transactionMutex.withLock {
-            // Closing TCP is sufficient; do not block disconnect on another camera response.
-            closeTransport()
-            savedTarget = null
-            catalogTransferEnabled = false
+    suspend fun disconnect() {
+        val epoch = nextSessionEpoch()
+        withContext(NonCancellable + Dispatchers.IO) {
+            transactionMutex.withLock {
+                // A later explicit connection owns cleanup if this request was superseded.
+                if (epoch != sessionEpoch) return@withLock
+                closeTransport()
+                savedTarget = null
+                targetEpoch = -1L
+                catalogTransferEnabled = false
+            }
         }
     }
 
@@ -149,33 +191,51 @@ class PtpIpClient {
         cmdOut = null
     }
 
+    /**
+     * Called only with transactionMutex held. Cancellation is allowed before acceptance, but
+     * once accepted we must consume the matching response (including discarded data), or close
+     * the transport on a real I/O/protocol failure. Never let another caller inherit unread bytes.
+     * Settlement is bounded by the existing 15s socket timeout and 30s total deadline.
+     */
     private suspend fun <T> guardedIo(block: () -> T): T {
-        val context = currentCoroutineContext()
-        context.ensureActive()
-        val deadline = System.nanoTime() + 30_000_000_000L
-        checkIo = {
-            context.ensureActive()
-            val remaining = deadline - System.nanoTime()
-            if (remaining <= 0) throw SocketTimeoutException("PTP transaction exceeded 30 seconds")
-            val timeout = minOf(15000L, maxOf(1L, remaining / 1_000_000L)).toInt()
-            cmdSocket?.soTimeout = timeout
-            eventSocket?.soTimeout = timeout
-        }
-        try {
-            return block()
-        } catch (failure: Exception) {
-            val sessionRefused = (listOf(failure) + failure.suppressed).any {
-                it is PtpResponseException && it.responseCode == PtpConstants.RC_SESSION_NOT_OPEN
+        val caller = currentCoroutineContext()
+        caller.ensureActive()
+        val result = try { withContext(NonCancellable) {
+            val deadline = System.nanoTime() + transactionTimeoutMillis * 1_000_000L
+            checkIo = {
+                val remaining = deadline - System.nanoTime()
+                if (remaining <= 0) throw SocketTimeoutException("PTP transaction exceeded 30 seconds")
+                val timeout = minOf(socketTimeoutMillis.toLong(), maxOf(1L, remaining / 1_000_000L)).toInt()
+                cmdSocket?.soTimeout = timeout
+                eventSocket?.soTimeout = timeout
             }
-            if (sessionRefused || (failure !is PtpResponseException && failure !is PtpDataException && failure !is PtpSessionClosedException)) {
-                if (lastSessionFailure == null) lastSessionFailure = failure
-                closeTransport()
+            try {
+                block()
+            } catch (failure: Exception) {
+                if (isSessionRefused(failure) || (failure !is PtpResponseException &&
+                    failure !is PtpDataException && failure !is PtpSessionClosedException)) {
+                    if (lastSessionFailure == null) lastSessionFailure = failure
+                    closeTransport()
+                }
+                throw failure
+            } finally {
+                checkIo = {}
             }
+        } } catch (failure: Exception) {
+            // A failed settlement already closed the transport and recorded its cause.
+            // A caller canceled during that wait must not leak the I/O error to its parent.
+            caller.ensureActive()
             throw failure
-        } finally {
-            checkIo = {}
         }
+        // Outside the fatal-I/O catch: cancellation after settlement is NOT a broken session.
+        caller.ensureActive()
+        return result
     }
+
+    private fun isSessionRefused(failure: Exception): Boolean =
+        (listOf(failure) + failure.suppressed).any {
+            it is PtpResponseException && it.responseCode == PtpConstants.RC_SESSION_NOT_OPEN
+        }
 
     suspend fun loadMediaList(): List<PtpImageMetadata> {
         // Method 1: Try modern Sony Content Catalog (A6700, A7M4, A7R5, A7C2, ZV-E1)
@@ -251,39 +311,36 @@ class PtpIpClient {
     }
 
     /** Failures propagate to the per-object loader instead of hiding the original transport cause. */
-    suspend fun getThumbnail(metadata: PtpImageMetadata): ByteArray? {
-        return run {
-            if (metadata.isContentCatalog) {
-                val hLow = metadata.handle and 0xFFFFFFFFL
-                val hHigh = metadata.handle ushr 32
-                executeDataIn(
-                    PtpConstants.OC_SONY_GET_CONTENT_THUMB,
-                    listOf(hLow, hHigh, 1L),
-                    limit = 512 * 1024
-                )
-            } else {
-                executeDataIn(
-                    PtpConstants.OC_GET_THUMB,
-                    listOf(metadata.handle),
-                    limit = 512 * 1024
-                )
-            }
+    suspend fun getThumbnail(metadata: PtpImageMetadata, expectedSessionEpoch: Long = captureSessionEpoch()): ByteArray? {
+        return if (metadata.isContentCatalog) {
+            executeDataIn(PtpConstants.OC_SONY_GET_CONTENT_THUMB,
+                listOf(metadata.handle and 0xffffffffL, metadata.handle ushr 32, 1L),
+                limit = 512 * 1024, expectedSessionEpoch = expectedSessionEpoch)
+        } else {
+            executeDataIn(PtpConstants.OC_GET_THUMB, listOf(metadata.handle),
+                limit = 512 * 1024, expectedSessionEpoch = expectedSessionEpoch)
         }
     }
 
     /** A camera-rendered large preview is a different request from its tiny thumbnail. */
-    suspend fun getPreview(metadata: PtpImageMetadata): ByteArray {
+    suspend fun getPreview(metadata: PtpImageMetadata, expectedSessionEpoch: Long = captureSessionEpoch()): ByteArray {
         check(metadata.isContentCatalog) { "This camera requires a rendered-original preview" }
         return executeDataIn(
             PtpConstants.OC_SONY_GET_CONTENT_THUMB,
             listOf(metadata.handle and 0xffffffffL, metadata.handle ushr 32, 2L),
-            limit = 8 * 1024 * 1024
+            limit = 8 * 1024 * 1024, expectedSessionEpoch = expectedSessionEpoch
         ).also { check(it.isNotEmpty()) { "Camera returned no preview" } }
     }
 
-    suspend fun executeCommand(opCode: Int, params: List<Long> = emptyList()): Int = withContext(Dispatchers.IO) {
-        require(params.size <= 5)
-        transactionMutex.withLock { guardedIo { executeCommandLocked(opCode, params) } }
+    suspend fun executeCommand(opCode: Int, params: List<Long> = emptyList()): Int {
+        val epoch = captureSessionEpoch()
+        return withContext(Dispatchers.IO) {
+            require(params.size <= 5)
+            transactionMutex.withLock {
+                requireSessionEpoch(epoch)
+                guardedIo { executeCommandLocked(opCode, params) }
+            }
+        }
     }
 
     private fun executeCommandLocked(opCode: Int, params: List<Long>): Int {
@@ -294,9 +351,15 @@ class PtpIpClient {
         return readResponse(input, output, id)
     }
 
-    suspend fun executeDataOut(opCode: Int, params: List<Long>, data: ByteArray): Int = withContext(Dispatchers.IO) {
-        require(params.size <= 5)
-        transactionMutex.withLock { guardedIo { executeDataOutLocked(opCode, params, data) } }
+    suspend fun executeDataOut(opCode: Int, params: List<Long>, data: ByteArray): Int {
+        val epoch = captureSessionEpoch()
+        return withContext(Dispatchers.IO) {
+            require(params.size <= 5)
+            transactionMutex.withLock {
+                requireSessionEpoch(epoch)
+                guardedIo { executeDataOutLocked(opCode, params, data) }
+            }
+        }
     }
 
     private fun executeDataOutLocked(opCode: Int, params: List<Long>, data: ByteArray): Int {
@@ -311,32 +374,39 @@ class PtpIpClient {
         return readResponse(input, output, id)
     }
 
-    suspend fun executeDataIn(opCode: Int, params: List<Long> = emptyList(), limit: Int = 8 * 1024 * 1024): ByteArray = withContext(Dispatchers.IO) {
-        require(limit in 1..32 * 1024 * 1024 && params.size <= 5)
-        transactionMutex.withLock {
-            guardedIo {
-                val input = cmdIn ?: throw PtpSessionClosedException(lastSessionFailure)
-                val output = cmdOut ?: throw PtpSessionClosedException(lastSessionFailure)
-                val id = transactionId++
-                sendPacket(output, PtpConstants.PKT_CMD_REQUEST, commandPayload(opCode, params, id, 1))
-                val accumulator = PtpDataAccumulator(id, limit)
-                var result: ByteArray? = null
-                while (result == null) {
-                    val (type, length) = readPacketHeader(input)
-                    when (type) {
-                        PtpConstants.PKT_DATA, PtpConstants.PKT_END_DATA ->
-                            accumulator.consumeData(type, length, input, checkIo)
-                        PtpConstants.PKT_PING, PtpConstants.PKT_PONG -> handleKeepAlive(type, length, output)
-                        else -> {
-                            require((type == PtpConstants.PKT_START_DATA && length == 12) ||
-                                (type == PtpConstants.PKT_CMD_RESPONSE && length in 6..26)) { "Unexpected PTP data-in packet $type/$length" }
-                            result = accumulator.consume(type, readExact(input, length))
-                        }
-                    }
-                }
-                checkNotNull(result)
+    suspend fun executeDataIn(opCode: Int, params: List<Long> = emptyList(), limit: Int = 8 * 1024 * 1024,
+                              expectedSessionEpoch: Long = captureSessionEpoch()): ByteArray {
+        val epoch = expectedSessionEpoch
+        return withContext(Dispatchers.IO) {
+            require(limit in 1..32 * 1024 * 1024 && params.size <= 5)
+            transactionMutex.withLock {
+                requireSessionEpoch(epoch)
+                guardedIo { executeDataInLocked(opCode, params, limit) }
             }
         }
+    }
+
+    private fun executeDataInLocked(opCode: Int, params: List<Long>, limit: Int): ByteArray {
+        val input = cmdIn ?: throw PtpSessionClosedException(lastSessionFailure)
+        val output = cmdOut ?: throw PtpSessionClosedException(lastSessionFailure)
+        val id = transactionId++
+        sendPacket(output, PtpConstants.PKT_CMD_REQUEST, commandPayload(opCode, params, id, 1))
+        val accumulator = PtpDataAccumulator(id, limit)
+        var result: ByteArray? = null
+        while (result == null) {
+            val (type, length) = readPacketHeader(input)
+            when (type) {
+                PtpConstants.PKT_DATA, PtpConstants.PKT_END_DATA ->
+                    accumulator.consumeData(type, length, input, checkIo)
+                PtpConstants.PKT_PING, PtpConstants.PKT_PONG -> handleKeepAlive(type, length, output)
+                else -> {
+                    require((type == PtpConstants.PKT_START_DATA && length == 12) ||
+                        (type == PtpConstants.PKT_CMD_RESPONSE && length in 6..26)) { "Unexpected PTP data-in packet $type/$length" }
+                    result = accumulator.consume(type, readExact(input, length))
+                }
+            }
+        }
+        return checkNotNull(result)
     }
 
     private fun commandPayload(opCode: Int, params: List<Long>, id: Int, phase: Int): ByteArray {
@@ -399,24 +469,45 @@ class PtpIpClient {
     }
 
     suspend fun readPartialObject(metadata: PtpImageMetadata, offset: Long, length: Int): ByteArray {
+        val (op, params) = partialObjectRequest(metadata, offset, length)
+        return executeDataIn(op, params, limit = length + 64)
+    }
+
+    /**
+     * Export-only recovery. The same offset is replayed at most once, before the caller writes
+     * any bytes locally. Generic commands/data-in/data-out deliberately never use this policy.
+     * A download pins its epoch across every chunk, so an old export cannot revive a deliberately
+     * disconnected camera or read an old handle from a newly connected camera.
+     */
+    suspend fun readPartialObjectWithRecovery(
+        metadata: PtpImageMetadata, offset: Long, length: Int, expectedSessionEpoch: Long
+    ): ByteArray = withContext(Dispatchers.IO) {
+        val (op, params) = partialObjectRequest(metadata, offset, length)
+        transactionMutex.withLock {
+            requireSessionEpoch(expectedSessionEpoch)
+            try {
+                guardedIo { executeDataInLocked(op, params, length + 64) }
+            } catch (failure: Exception) {
+                currentCoroutineContext().ensureActive()
+                if (failure !is IOException && failure !is PtpSessionClosedException && !isSessionRefused(failure)) throw failure
+                requireSessionEpoch(expectedSessionEpoch)
+                reconnectLocked()
+                requireSessionEpoch(expectedSessionEpoch)
+                guardedIo { executeDataInLocked(op, params, length + 64) }
+            }
+        }
+    }
+
+    private fun partialObjectRequest(metadata: PtpImageMetadata, offset: Long, length: Int): Pair<Int, List<Long>> {
         require(offset >= 0 && length in 1..(32 * 1024 * 1024 - 64))
         return if (metadata.isContentCatalog) {
-            val hLow = metadata.handle and 0xFFFFFFFFL
-            val hHigh = metadata.handle ushr 32
-            val offLow = offset and 0xFFFFFFFFL
-            val offHigh = offset ushr 32
-            executeDataIn(
-                PtpConstants.OC_SONY_READ_CONTENT_OBJECT,
-                listOf(hLow, hHigh, offLow, offHigh, length.toLong()),
-                limit = length + 64
+            PtpConstants.OC_SONY_READ_CONTENT_OBJECT to listOf(
+                metadata.handle and 0xffffffffL, metadata.handle ushr 32,
+                offset and 0xffffffffL, offset ushr 32, length.toLong()
             )
         } else {
-            val offsetLow = offset and 0xFFFFFFFFL
-            val offsetHigh = offset ushr 32
-            executeDataIn(
-                PtpConstants.OC_SONY_GET_PARTIAL_LARGE_OBJECT,
-                listOf(metadata.handle, offsetLow, offsetHigh, length.toLong()),
-                limit = length + 64
+            PtpConstants.OC_SONY_GET_PARTIAL_LARGE_OBJECT to listOf(
+                metadata.handle, offset and 0xffffffffL, offset ushr 32, length.toLong()
             )
         }
     }

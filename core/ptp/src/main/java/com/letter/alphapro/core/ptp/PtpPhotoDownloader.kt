@@ -31,12 +31,42 @@ class PtpPhotoDownloader(
 ) {
     companion object {
         const val CHUNK_SIZE = 512 * 1024 // 512 KB chunks
+
+        /** Shared by both destinations; no Android storage is needed to test wire recovery. */
+        internal suspend fun downloadStream(
+            client: PtpIpClient,
+            metadata: PtpImageMetadata,
+            outputStream: OutputStream,
+            sessionEpoch: Long,
+            onProgress: suspend (Long) -> Unit
+        ) {
+            client.reconnectIfNeeded(sessionEpoch)
+            var offset = 0L
+            val total = metadata.fileSize
+            while (offset < total) {
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                val length = minOf(CHUNK_SIZE.toLong(), total - offset).toInt()
+                val chunk = client.readPartialObjectWithRecovery(metadata, offset, length, sessionEpoch)
+                if (chunk.isEmpty() || chunk.size > length) {
+                    throw java.io.IOException("Invalid PTP chunk (${chunk.size} bytes, requested=$length, offset=$offset, total=$total)")
+                }
+                // A failed attempt has written nothing. Only a complete successful chunk advances
+                // the local offset, so retrying the same remote range cannot duplicate local data.
+                outputStream.write(chunk)
+                offset += chunk.size
+                onProgress(offset)
+            }
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            outputStream.flush()
+        }
     }
 
     fun downloadToMediaStore(
         metadata: PtpImageMetadata,
         folderName: String = "AlphaPro"
     ): Flow<DownloadProgress> = flow {
+        val sessionEpoch = client.captureSessionEpoch()
+        client.reconnectIfNeeded(sessionEpoch)
         val resolver = context.contentResolver
         val mimeType = when {
             metadata.isHeif -> "image/heif"
@@ -58,7 +88,7 @@ class PtpPhotoDownloader(
 
         try {
             resolver.openOutputStream(uri)?.use { outputStream ->
-                downloadStream(metadata, outputStream) { downloaded ->
+                downloadStream(client, metadata, outputStream, sessionEpoch) { downloaded ->
                     emit(
                         DownloadProgress(
                             filename = metadata.filename,
@@ -143,14 +173,16 @@ class PtpPhotoDownloader(
         metadata: PtpImageMetadata,
         onProgress: (bytesDownloaded: Long, totalBytes: Long) -> Unit = { _, _ -> }
     ): File {
+        val sessionEpoch = client.captureSessionEpoch()
         var tempFile: File? = null
         var delivered = false
         try {
             val downloaded = withContext(Dispatchers.IO) {
+                client.reconnectIfNeeded(sessionEpoch)
                 val file = File.createTempFile("alphapro_", "_" + metadata.filename, context.cacheDir)
                 tempFile = file
                 FileOutputStream(file).use { out ->
-                    downloadStream(metadata, out) { size ->
+                    downloadStream(client, metadata, out, sessionEpoch) { size ->
                         onProgress(size, metadata.fileSize)
                     }
                 }
@@ -166,24 +198,4 @@ class PtpPhotoDownloader(
         }
     }
 
-    private suspend fun downloadStream(
-        metadata: PtpImageMetadata,
-        outputStream: OutputStream,
-        onProgress: suspend (Long) -> Unit
-    ) {
-        var offset = 0L
-        val total = metadata.fileSize
-
-        while (offset < total) {
-            val length = minOf(CHUNK_SIZE.toLong(), total - offset).toInt()
-            val chunk = client.readPartialObject(metadata, offset, length)
-            if (chunk.isEmpty()) {
-                throw java.io.IOException("PTP data transfer interrupted: empty chunk (offset=$offset, total=$total)")
-            }
-            outputStream.write(chunk)
-            offset += chunk.size
-            onProgress(offset)
-        }
-        outputStream.flush()
-    }
 }

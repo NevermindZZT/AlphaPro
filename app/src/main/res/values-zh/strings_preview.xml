@@ -12,4 +12,9 @@
     <string name="preview_failed">预览读取失败：%1$s</string>
     <string name="preview_original_limit">未提供大预览，或原片超出安全预览大小；请手动导出。</string>
     <string name="preview_original_incomplete">原片预览数据不完整。</string>
+    <string name="preview_camera_system_source">相机预览（系统解码） · %1$d × %2$d</string>
+    <string name="preview_camera_software_source">相机预览（软件解码） · %1$d × %2$d</string>
+    <string name="preview_original_system_source">原片临时预览（系统解码，不导出） · %1$d × %2$d</string>
+    <string name="preview_original_software_source">原片临时预览（软件解码，不导出） · %1$d × %2$d</string>
+    <string name="preview_thumbnail_attempts">仅请求相机缩略图／预览，不进行 JPEG 导出。以下为各来源及阶段详情：\n%1$s</string>
 </resources>

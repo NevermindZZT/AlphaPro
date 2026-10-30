@@ -2,9 +2,13 @@ package com.letter.alphapro.ui.gallery
 
 import com.letter.alphapro.ui.components.*
 import android.graphics.Bitmap
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.rememberScrollState
@@ -48,7 +52,7 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
     var filter by rememberSaveable { mutableIntStateOf(0) }
     var selecting by rememberSaveable { mutableStateOf(false) }
     var collapsedDates by rememberSaveable { mutableStateOf(emptyList<String>()) }
-    val selected = remember { mutableStateListOf<String>() }
+    val selected = viewModel.selectedGroupIds
     var exportSheet by remember { mutableStateOf(false) }
     val grid = rememberLazyGridState()
     val connected = state.wifiState is CameraWifiState.Connected
@@ -155,14 +159,23 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
                         }
                         if (!collapsed) items(section.captures, key = { it.id }) { group ->
                             val file = group.visualFile
-                            PhotoGroupGridCell(group, thumbnails[file.handle], errors[file.handle]?.asString(), selecting,
+                            val isMultiSelect = selecting || selected.isNotEmpty()
+                            PhotoGroupGridCell(group, thumbnails[file.handle], errors[file.handle]?.asString(), isMultiSelect,
                                 group.id in selected, state.downloadProgressMap[file.filename],
-                                onRequest = { viewModel.requestThumbnail(file) },
+                                onRequest = { viewModel.requestThumbnail(file, group.rawFile) },
                                 onRelease = { viewModel.releaseThumbnailRequest(file.handle) },
-                                onRetry = { viewModel.retryThumbnail(file) },
+                                onRetry = { viewModel.retryThumbnail(file, group.rawFile) },
                                 onClick = {
-                                    if (selecting) { if (group.id in selected) selected.remove(group.id) else selected.add(group.id) }
-                                    else viewModel.openPhoto(group)
+                                    if (isMultiSelect) {
+                                        if (group.id in selected) selected.remove(group.id) else selected.add(group.id)
+                                        if (selected.isEmpty()) selecting = false
+                                    } else {
+                                        viewModel.openPhoto(group, filtered)
+                                    }
+                                },
+                                onLongClick = {
+                                    selecting = true
+                                    if (group.id !in selected) selected.add(group.id)
                                 })
                         }
                     }
@@ -180,23 +193,50 @@ fun CameraGalleryScreen(viewModel: CameraViewModel, modifier: Modifier = Modifie
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PhotoGroupGridCell(
     group: CameraCaptureGroup, thumbnail: Bitmap?, error: String?, selecting: Boolean, selected: Boolean,
-    progress: Float?, onRequest: () -> Unit, onRelease: () -> Unit, onRetry: () -> Unit, onClick: () -> Unit
+    progress: Float?, onRequest: () -> Unit, onRelease: () -> Unit, onRetry: () -> Unit, onClick: () -> Unit,
+    onLongClick: () -> Unit = {}
 ) {
+    var showError by remember(group.id, error) { mutableStateOf(false) }
+    if (showError && error != null) AlertDialog(
+        onDismissRequest = { showError = false },
+        title = { Text(stringResource(R.string.gallery_thumbnail_error_title, group.baseName)) },
+        text = {
+            SelectionContainer {
+                Text(error, Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                    style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            AlphaTextButton(onClick = { showError = false }) { Text(stringResource(R.string.gallery_close)) }
+        }
+    )
     LaunchedEffect(group.visualFile.handle, thumbnail == null, error) {
         if (thumbnail == null && error == null) onRequest()
     }
     DisposableEffect(group.visualFile.handle) { onDispose { onRelease() } }
-    Surface(Modifier.aspectRatio(1f).clickable(onClick = onClick), shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+    Surface(
+        modifier = Modifier
+            .aspectRatio(1f)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
         Box(Modifier.fillMaxSize()) {
             if (thumbnail != null) Image(thumbnail.asImageBitmap(), stringResource(R.string.gallery_photo_description, group.baseName), Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             else Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (error == null) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                 else {
-                    Icon(Icons.Rounded.BrokenImage, error, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.outline)
+                    AlphaIconButton(onClick = { showError = true }) {
+                        Icon(Icons.Rounded.BrokenImage, stringResource(R.string.gallery_thumbnail_error_details),
+                            Modifier.size(28.dp), tint = MaterialTheme.colorScheme.outline)
+                    }
                     AlphaTextButton(onClick = onRetry) { Text(stringResource(R.string.gallery_retry_thumbnail), style = MaterialTheme.typography.labelLarge) }
                 }
             }

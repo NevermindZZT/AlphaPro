@@ -19,7 +19,7 @@ def check(apk, readelf):
     platform = {"libc.so", "libm.so", "libdl.so", "liblog.so", "libjnigraphics.so",
                 "libandroid.so", "libz.so", "libatomic.so"}
     symbols = ["Java_com_letter_alphapro_core_heif_HeifDecoder_" + name for name in
-               ("nativeDecodeFile", "nativeDecodeThumbnail", "nativeDecodePreview", "nativeReadExif")]
+               ("nativeDecodeFile", "nativeDecodeThumbnail", "nativeDecodePreview", "nativeDecodeFilePreview", "nativeReadExif")]
     with zipfile.ZipFile(apk) as archive, tempfile.TemporaryDirectory(prefix="alphapro-elf-") as work:
         packaged_abis = {name.split("/")[1] for name in archive.namelist()
                          if name.startswith("lib/") and name.endswith(".so")}

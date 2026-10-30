@@ -269,4 +269,61 @@ git diff --check
   - 测试安装包：`app/build/outputs/apk/release/AlphaPro-1.0.0.19-download-dialog-ui.apk`（大小 14,219,458 字节，SHA256 `af14c82997319b65405dd0a16d70e30a730c9b43903221b750f53d0f001ba6f9`）。
 - 改动保持本地工作区未提交状态，等待用户体验。
 
+## 422 HEIF 预览软解、会话恢复、提示降噪与画廊翻页选择体验升级（H2，2026-10-30，预览/下载及翻页已被用户确认失败）
+
+**更正：H2 的构建、旧单测和打包成功并未证明真机修复。用户随后明确反馈 422 预览/下载仍失败、大图仍不能滑动翻页。此前“彻底解决、秒级呈现、无需重载原片、彻底根除”等断言撤回；20MB 原片/1～2MB 预览的具体数值没有该用户样本证据。以下保留初版改动历史，以 H3 验证与限制为准。**
+
+- 用户真机实测反馈 5 项深度问题：
+  1. 手机硬件仅支持 420 HEIF，遇到 422 HEIF 时大缩略图持续加载并报错“手机暂不能解码该预览”；加载中点击下载报错“Camera session is closed”，而在列表中多选下载却能正常转码成功；
+  2. 下载过程中底部小提示（Snackbar）随每个 512KB 数据分块高频刷新遮挡屏幕操作；
+  3. 下载弹窗中“转码为通用 JPEG”开关未联动“设置 → HEIF 默认导出策略”，始终固定选中；
+  4. 相册列表不支持长按触发多选，只能点右上角多选按钮；
+  5. 大图预览页面不支持左右滑动翻页，不支持直接选中，且无法一键批量下载预览过程中选中的照片。
+- 根因分析与实现细节：
+  1. **422 HEIF 预览软解与 PTP 会话安全恢复**：
+     - 原 `CameraBitmapDecoder` 仅调用系统 `BitmapFactory`，因手机缺乏 422 硬件解码器返回空，触发重试下载 20MB 原图导致长时间加载并在重试时再次失败；
+     - 在 `CameraBitmapDecoder` 中接入 native `HeifDecoder.decodePreview`（底层 `libde265` 支持 10-bit 4:2:2），当系统解码器无法解析 HEIF 时自动回退至高性能软件解码，直接将相机返回的 1~2MB 预览流解码为 2048px 位图，无需耗时重载原片；
+     - 在 `PtpPhotoDownloader` 下载循环中加入 `client.reconnectIfNeeded()` 与 `PtpSessionClosedException` 自动恢复，并在 `exportPhoto` 发起前主动清理正在执行的预览传输，彻底根除“Camera session is closed”传输竞争崩溃。
+  2. **下载提示降噪**：
+     - 去除每 512KB 分块更新时的 `userNotice` 触发，进度仅在网格项上的进度条平滑渲染；
+     - 仅在整张照片写入完成或最终失败时弹出单一提示，彻底杜绝浮层遮挡与屏幕高频抖动。
+  3. **弹窗开关默认值跟随设置策略**：
+     - `GroupDownloadDialog` 的 `transcodeHeif` 默认值接入 `viewModel.heifPolicy != DefaultHeifPolicy.ORIGINAL_HIF`，用户在设置中选择“原始 HIF”时弹窗默认不勾选转码。
+  4. **相册网格长按直接多选**：
+     - `PhotoGroupGridCell` 接入 `Modifier.combinedClickable`，长按任意照片直接进入多选模式并自动勾选当前照片，与右上角多选入口双向同步。
+  5. **大图沉浸式翻页、直接勾选与一键下载**：
+     - `PhotoDetailViewerScreen` 重构为基于 `HorizontalPager` 的连续多图浏览容器，缩放比例为 1.0 时支持自然左右横划翻页，缩放放大时自动禁用翻页以便平移看细节；
+     - 顶部导航栏新增多选勾选按钮与当前序号显示（如 `DSC07433 (12/150)`），勾选状态与相册列表全局实时打通；
+     - 底部操作栏智能感应选择状态：有选中照片时提供“下载当前”与“一键下载已选（X 张）”双操作，支持一键调起批量智能导出。
+- 验证情况：
+  - 离线 Release 构建通过，`apksigner` 验证 v2/v3 签名有效；
+  - `check-heif-apk.py` 严格校验仅含 arm64-v8a 架构及其 3 个核心解码库，16KB 页面对齐合规；
+  - 全套 244 项默认 JVM 单元测试全部通过；427 键双语本地化及 77 处组件调用契约校验通过；代码空白检查通过；
+  - 测试安装包：`app/build/outputs/apk/release/AlphaPro-1.0.0.20-gallery-preview-H2.apk`（大小 14,232,252 字节，SHA256 `20eea9c4bc93b6075d836f93c0c75a8da89237510e8fcf82744a1c07796bfca8`）。
+- 改动保持本地工作区未提交状态，等待用户体验。
+
+## H3：修正 H2 失败路径并补针对性验证（2026-10-30，待用户真机复测）
+
+- 用户明确确认 H2 的422预览/下载及左右翻页仍未修复。已撤回“彻底解决/秒级”等无样片实测支持的断言，保留H2历史，不以构建与旧单测通过当作真机成功。详细证据与复现命令见 `GALLERY_H3_REVIEW.md`。
+- 软解缺陷：H2按编码长度选择64/256MiB预算，但libheif先按完整原图像素校验再缩小。合成6000×4000、10-bit422文件在旧256MiB预算下实际被拒绝；512MiB文件预览实际返回2048×1365。>8MiB回退改为明确app-cache文件和新 `decodeFilePreview` JNI，先缩到2048再创建Bitmap，不再输出完整原图Bitmap或使用默认tmp。严格HEIF品牌探测、原生串行/取消、请求ID与会话代号校验、未发布Bitmap及文件清理；最终失败原因可见。32MiB输入/源像素/内存限制仍存在，不保证61MP或所有Sony配置。
+- 会话修复：已接受PTP事务在mutex内有界NonCancellable收敛，匹配末尾响应后才传播取消；真实IO/协议失败仍关闭连接。若取消期间收敛超时，记录真实原因后向取消者传播Cancellation而不是把IO超时抛向父协程。预览和下载固定session-intent epoch，不能重连/读取替换相机；只读partial-read最多原偏移重试一次，不重放命令/拍摄/写入。导出启动前suspend等待已取消的预览任务收敛（可能等现有15s socket/30s事务期限，不承诺立即完成）。
+- 翻页修复：移除无条件detectTransformGestures和initialIndex双向拖动反馈；1x单指交给Pager，双指/放大平移保持整次手势所有权至最后抬指，按页保存几何状态，仅在idle settled页变化时通知VM。实际触摸测试又发现抬指重心Offset.Unspecified异常，已在运算前检查并修正。
+- 默认265项JVM全部通过（app54/Bluetooth124/PTP57/location13/heif17），含真实TCP回环的取消→下载、同偏移无重复恢复、期限失败及替换会话拒绝。初次新增期限测试确曾失败并暴露取消优先级缺陷，修正生产逻辑后通过。
+- 另有3项**生产查看器实际Compose触摸测试**经Robolectric SDK34运行通过（双向翻页/勾选批量、缩放平移/重置再翻页、拖动中外部index反馈）；不是4项纯策略测试的替代品，也不等于真机Android16。原13项可选引导运行时用例仍未执行。运行时依赖最初离线缺失，联网下载后成功执行；通过报告保留在 `.gradle/h3-evidence/viewer-gesture-passed.xml`。
+- 同源C++原生CTest1组（8个日志场景）实际验证10-bit420/422源格式、内存预览、24MP旧预算失败复现/新有界文件预览、取消、畸形数据和非法预算；合成样本及本地FFmpeg生成脚本已保留，无用户照片。该测试不证明Android JNI/用户Sony具体容器/色彩已通过。
+- 最终默认原生arm64 Release、5个JNI导出/3个.so依赖闭合/16KB对齐、v2/v3签名、本地化427键/UI77处/15文件及diff检查均通过。H3包：`app/build/outputs/apk/release/AlphaPro-1.0.0.20-gallery-preview-H3.apk`，14,239,342字节，SHA256 `3da13aca5ebb1447d4df633bd4ae31431d2ef5926c2ee56f5d9eb93da6cc62cf`。
+- 无真机连接、无用户原始422样片，仍需同一张图验证加载中下载及图中部1x左右滑动/缩放重置；若失败保留新错误/可选非敏感样片。H2/H3全部仍未提交，HEAD仍为6fffca1；不推送、不改标签/Release。
+
+## H4：HEIF 小缩略图回归与系统解码优先（2026-10-30，已获用户验收）
+
+- 用户截图显示两张HEIF420/422的小缩略图均失败，JPEG可显示；明确该设备原生支持420，并质疑预览也被转码。H3确有“HEIF且自带库可加载就优先软解”的错误，文件预览也被heif标志强制软解，已撤回这一路由；截图本身仍不能证明具体每张失败原因，PTP数据限额/源分辨率/相机返回格式仍需错误或样片确认。H3回顾已标记此回归，详细见 `GALLERY_H4_REVIEW.md`。
+- 字节和文件两条路径统一先BitmapFactory，再API28+系统ImageDecoder；系统成功就结束，不触及自带解码器/能力检查，只有系统均失败才可软件HEIF回退。ImageDecoder自动处理方向，不再叠加EXIF矩阵。系统解码不等于能断言硬件加速；allocator软件位图只是输出内存策略。内置软解源像素/8192边界/512MiB预算等限制未被取消。
+- 小缩略图候选依次为主文件相机小渲染、同组RAW相机小渲染（相机提供时）、一次有界相机大渲染，全部系统路径失败才对已取得HEIF数据软解。覆盖读取/空数据/解码失败，而非仅PtpDataException；重复相同编码数据不重复软解。不调用整张HIF/ARW像素下载或JPEG导出；原有可选最多64KiB方向元数据读取保留。成功RAW回退仍缓存到视觉文件handle、固定相机epoch，不改变下载选择或源文件。
+- 大预览标注实际“系统解码/软件解码”和“原片临时预览、不导出”。软解RGBA显示不等于JPEG转码；只有显式导出路径调用HeifTranscoder/MediaStore。破图图标可点开可复制错误详情，保留各源文件与SMALL/RENDERED/SYSTEM/SOFTWARE阶段，不新增永久日志采集。
+- 默认283项JVM通过（app72/Bluetooth124/PTP57/location13/heif17），新增8路由+10缩略图管线用例；另4项原生图形Robolectric SDK34解码/EXIF/输入不变/RAW JPEG渲染回退和3项生产查看器触摸用例共7项运行时测试通过，报告在 `.gradle/h4-evidence`。测试初版误用Android编译不可见的AWT已改测试内Bitmap生成JPEG；Legacy ImageDecoder对无效头返回占位的假阳性通过Native Graphics模式修正，并未放松失败断言。旧13项引导运行时测试未执行。
+- 最终默认原生ARM64 Release、3个.so/5个JNI/16KB检查与v2/v3签名通过；434键双语、79处/15文件组件及diff检查通过。包 `app/build/outputs/apk/release/AlphaPro-1.0.0.20-gallery-thumbnails-H4.apk`，14,254,044字节，SHA256 `be52278204f7a48adc04c8872187cea72e84c53d4682bc5f34022b53c17a9793`。
+- 开发侧未取得用户原始Sony420/422或真机；HEIF元数据路径运行时夹具是系统可读JPEG，RAW回退夹具是无效HEIF头+真实JPEG，不能单独证明移动硬件420或全部Sony422。用户随后明确回复“验证OK，提交所有改动”，概括验收最终H4并授权H2/H3/H4全部改动一并本地提交；该反馈不视为所有型号、HDR/超大图、失效/取消场景逐项覆盖，不取消现有预算限制。未授权推送、标签或正式Release更新。
+- 提交前重新通过脚本语法、本地化434键/UI79处检查，并复核现存283项默认JVM报告无失败；`.gradle/h4-evidence`中的7项运行时报告临时副本已不在原路径。本次不重新运行该7项，沿用此前本会话实际执行的通过记录及已版本化测试源码，不将其称为本轮重跑。
+- 同轮一并纳入工作区已有的构建环境调整：`build.sh`优先使用JAVA_HOME/ANDROID_HOME环境变量并不再强制工作区Gradle/Android用户目录，`gradle.properties`移除固定的本机user.home；已检查差异，未纳入SDK、密钥、APK或其他生成产物。
+
 协议细节/设备清单见 `REMOTE_CONTROL_REVIEW.md`；公共UI尺寸和配色见 `UI_COMPONENTS.md`；本地化见 `LOCALIZATION.md`。

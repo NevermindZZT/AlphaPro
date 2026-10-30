@@ -21,6 +21,8 @@
     <string name="gallery_collapse_date">Collapse date group</string>
     <string name="gallery_photo_description">Photo: %1$s</string>
     <string name="gallery_retry_thumbnail">Retry thumbnail</string>
+    <string name="gallery_thumbnail_error_details">View thumbnail error details</string>
+    <string name="gallery_thumbnail_error_title">Thumbnail error · %1$s</string>
     <string name="gallery_select_photo">Select photo: %1$s</string>
     <string name="gallery_deselect_photo">Deselect photo: %1$s</string>
     <string name="gallery_viewer_title">Photo viewer</string>
@@ -52,6 +54,9 @@
     <string name="gallery_badge_edit">Edit</string>
     <string name="gallery_download_both">RAW + %1$s</string>
     <string name="gallery_download_both_description">About %1$s total · Save both to gallery</string>
+    <string name="gallery_download_current">Current only</string>
+    <string name="gallery_download_selected">Download selected (%1$d)</string>
+    <string name="gallery_viewer_photo_title">%1$s (%2$d/%3$d)</string>
     <string name="gallery_badge_save_all">Keep all</string>
     <string name="gallery_transcode_quality">Convert to JPEG (%1$s quality)</string>
     <string name="gallery_transcode_description">Keep shooting EXIF and support all galleries</string>

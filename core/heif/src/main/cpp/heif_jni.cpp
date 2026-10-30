@@ -135,7 +135,7 @@ private:
 }
 
     jobject decodeMemory(JNIEnv *env, jclass decoder, jbyteArray encoded, jlong memoryBudget,
-            jsize maxBytes, int maxDimension) {
+            jsize maxBytes, int maxDimension, jobject callback) {
         const auto length = encoded ? env->GetArrayLength(encoded) : 0;
         if (memoryBudget <= 0 || length <= 0 || length > maxBytes) {
             throwIo(env, "Invalid HEIF preview");
@@ -144,10 +144,10 @@ private:
         const ByteArrayElements bytes(env, encoded);
         if (env->ExceptionCheck()) return nullptr;
         if (!bytes.get()) throw std::bad_alloc();
+        Cancellation cancelled(env, callback);
+        if (env->ExceptionCheck()) return nullptr;
         const auto image = alpha::decodeHeif(nullptr, bytes.get(), length, maxDimension,
-                memoryBudget, [] {
-                    return false;
-                });
+                memoryBudget, [&] { return cancelled(); });
         return bitmapFromImage(env, decoder, image.get());
     }
 }
@@ -173,17 +173,33 @@ Java_com_letter_alphapro_core_heif_HeifDecoder_nativeDecodeFile(JNIEnv* env, jcl
 
 extern "C" JNIEXPORT jobject JNICALL
 Java_com_letter_alphapro_core_heif_HeifDecoder_nativeDecodeThumbnail(JNIEnv* env, jclass decoder, jbyteArray encoded,
-                                                       jlong memoryBudget) {
+                                                       jlong memoryBudget, jobject callback) {
     return protect(env, [&] {
-        return decodeMemory(env, decoder, encoded, memoryBudget, 512 * 1024, 640);
+        return decodeMemory(env, decoder, encoded, memoryBudget, 512 * 1024, 640, callback);
     });
 }
 
 extern "C" JNIEXPORT jobject JNICALL
 Java_com_letter_alphapro_core_heif_HeifDecoder_nativeDecodePreview(JNIEnv *env, jclass decoder, jbyteArray encoded,
-        jlong memoryBudget) {
+        jlong memoryBudget, jobject callback) {
     return protect(env, [&] {
-        return decodeMemory(env, decoder, encoded, memoryBudget, 8 * 1024 * 1024, 2048);
+        return decodeMemory(env, decoder, encoded, memoryBudget, 8 * 1024 * 1024, 2048, callback);
+    });
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_letter_alphapro_core_heif_HeifDecoder_nativeDecodeFilePreview(JNIEnv* env, jclass decoder, jstring path,
+                                                                     jlong memoryBudget, jobject callback) {
+    return protect(env, [&]() -> jobject {
+        if (memoryBudget <= 0) throw std::invalid_argument("Invalid HEIF preview budget");
+        UtfChars filename(env, path);
+        if (env->ExceptionCheck()) return nullptr;
+        if (!filename.get() || !*filename.get()) throw std::invalid_argument("Invalid HEIF preview path");
+        Cancellation cancelled(env, callback);
+        if (env->ExceptionCheck()) return nullptr;
+        const auto image = alpha::decodeHeif(filename.get(), nullptr, 0, 2048, memoryBudget,
+                [&] { return cancelled(); });
+        return bitmapFromImage(env, decoder, image.get());
     });
 }
 

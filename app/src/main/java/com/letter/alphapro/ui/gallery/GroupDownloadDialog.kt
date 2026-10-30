@@ -33,11 +33,12 @@ enum class GroupDownloadTarget {
 @Composable
 fun GroupDownloadDialog(
     group: CameraCaptureGroup,
+    defaultTranscodeHeif: Boolean = true,
     onDismissRequest: () -> Unit,
     onConfirmDownload: (target: GroupDownloadTarget, transcodeHeifToJpeg: Boolean) -> Unit
 ) {
     var selectedTarget by remember { mutableStateOf(GroupDownloadTarget.VISUAL_ONLY) }
-    var transcodeHeif by remember { mutableStateOf(true) }
+    var transcodeHeif by remember { mutableStateOf(defaultTranscodeHeif && com.letter.alphapro.core.heif.HeifDecoder.isAvailable) }
 
     val visualName = stringResource(if (group.hasHeif) R.string.gallery_format_heif_10bit else R.string.gallery_format_jpeg)
     val visualSizeMb = gallerySizeLabel(group.visualFile.fileSize / (1024.0 * 1024.0))

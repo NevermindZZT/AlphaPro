@@ -1,5 +1,6 @@
 package com.letter.alphapro.core.ptp
 
+import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.DataInputStream
 import java.io.EOFException
@@ -13,6 +14,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -203,24 +205,259 @@ class CameraPreviewProtocolTest {
         }
     }
 
-    @Test(timeout = 15000) fun cancellationMidTransactionClosesRatherThanIgnoringMisalignedData() = runBlocking {
+    @Test(timeout = 15000) fun cancelledAcceptedPreviewSettlesBeforeQueuedExportUsesSameSession() = runBlocking {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
-        FakeCamera(plan = { op, _, _ ->
-            if (op == 0x923d) { entered.countDown(); check(release.await(5, TimeUnit.SECONDS)) }
-            Reply()
+        FakeCamera(plan = { op, params, _ ->
+            if (op == 0x923e && params.last() == 2L) Reply(beforeResponse = {
+                entered.countDown()
+                check(release.await(5, TimeUnit.SECONDS))
+            }) else Reply()
         }).use { camera ->
             val client = PtpIpClient()
             client.connect("127.0.0.1", camera.port)
-            val read = async(Dispatchers.IO) { client.readPartialObject(photo(), 0, 4) }
-            check(entered.await(5, TimeUnit.SECONDS))
-            read.cancel()
+            val preview = async(Dispatchers.IO) { client.getPreview(photo()) }
+            check(entered.await(5, TimeUnit.SECONDS)) // Data sent; final response still withheld.
+            preview.cancel()
+            val output = ByteArrayOutputStream()
+            val export = async(Dispatchers.IO) {
+                PtpPhotoDownloader.downloadStream(client, photo(), output, client.captureSessionEpoch()) {}
+            }
             release.countDown()
-            read.join()
-            assertTrue(client.lastSessionFailure is kotlinx.coroutines.CancellationException)
-            try { client.getThumbnail(photo()); fail("Expected closed stream after cancellation") }
-            catch (_: PtpSessionClosedException) {}
+            preview.join()
+            export.await()
+            assertTrue(preview.isCancelled)
+            assertArrayEquals(image, output.toByteArray())
+            assertNull(client.lastSessionFailure)
+            assertEquals(1, camera.sessions.get())
+            assertEquals(listOf(0x9210, 0x923e, 0x923d), camera.requests.map { it.first })
             client.disconnect()
+        }
+    }
+
+    @Test(timeout = 15000) fun cancellationWhileWaitingForMutexDoesNotSendOrCloseAnything() = runBlocking {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        FakeCamera(plan = { op, _, _ ->
+            if (op == 0x923d) Reply(beforeResponse = {
+                entered.countDown(); check(release.await(5, TimeUnit.SECONDS))
+            }) else Reply()
+        }).use { camera ->
+            val client = PtpIpClient()
+            client.connect("127.0.0.1", camera.port)
+            val active = async(Dispatchers.IO) { client.readPartialObject(photo(), 0, 4) }
+            check(entered.await(5, TimeUnit.SECONDS))
+            val queued = async(start = CoroutineStart.UNDISPATCHED) { client.getPreview(photo()) }
+            queued.cancel()
+            queued.join()
+            release.countDown()
+            assertArrayEquals(image, active.await())
+            assertArrayEquals(image, client.getThumbnail(photo()))
+            assertEquals(1, camera.requests.count { it.first == 0x923e }) // Thumbnail only.
+            assertNull(client.lastSessionFailure)
+            assertEquals(1, camera.sessions.get())
+            client.disconnect()
+        }
+    }
+
+    @Test(timeout = 15000) fun cancelledAcceptedCommandsAndWritesSettleButAreNeverReplayed() = runBlocking {
+        for (write in listOf(false, true)) {
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val op = if (write) 0x9207 else 0x100e
+            FakeCamera(plan = { request, _, _ ->
+                if (request == op) Reply(beforeResponse = {
+                    entered.countDown(); check(release.await(5, TimeUnit.SECONDS))
+                }) else Reply()
+            }).use { camera ->
+                val client = PtpIpClient()
+                client.connect("127.0.0.1", camera.port)
+                val command = async(Dispatchers.IO) {
+                    if (write) client.executeDataOut(op, listOf(1), byteArrayOf(2)) else client.executeCommand(op)
+                }
+                check(entered.await(5, TimeUnit.SECONDS))
+                command.cancel()
+                val next = async(Dispatchers.IO) { client.getThumbnail(photo()) }
+                release.countDown()
+                command.join()
+                assertArrayEquals(image, next.await())
+                assertEquals(1, camera.requests.count { it.first == op })
+                assertEquals(1, camera.sessions.get())
+                assertNull(client.lastSessionFailure)
+                client.disconnect()
+            }
+        }
+    }
+
+    @Test(timeout = 15000) fun exportRetriesOnlyFailedRangeOnceAfterSocketLossWithoutDuplicatingLocalBytes() = runBlocking {
+        for (catalog in listOf(true, false)) {
+            val partialReads = AtomicInteger()
+            val op = if (catalog) 0x923d else 0x9211
+            FakeCamera(plan = { request, _, _ ->
+                if (request == op && partialReads.incrementAndGet() == 2) Reply(dropAfterData = true) else Reply()
+            }).use { camera ->
+                val client = PtpIpClient()
+                client.connect("127.0.0.1", camera.port)
+                val output = ByteArrayOutputStream()
+                val progress = mutableListOf<Long>()
+                PtpPhotoDownloader.downloadStream(client, photo().copy(fileSize = 8, isContentCatalog = catalog),
+                    output, client.captureSessionEpoch()) { progress.add(it) }
+                assertArrayEquals(image + image, output.toByteArray())
+                assertEquals(listOf(4L, 8L), progress)
+                val requests = camera.requests.filter { it.first == op }.map { it.second }
+                val offsetIndex = if (catalog) 2 else 1
+                assertEquals(listOf(0L, 4L, 4L), requests.map { it[offsetIndex] })
+                assertEquals(requests[1], requests[2])
+                assertEquals(2, camera.sessions.get())
+                client.disconnect()
+            }
+        }
+    }
+
+    @Test(timeout = 15000) fun exportRecoversSessionNotOpenButNotObjectRefusalOrLengthFailure() = runBlocking {
+        for (code in listOf(0x2003, 0x2005, 0x2001)) {
+            val reads = AtomicInteger()
+            FakeCamera(plan = { op, _, _ ->
+                if (op == 0x923d && reads.incrementAndGet() == 1) {
+                    if (code == 0x2001) Reply(announced = 100) else Reply(code = code, bytes = 0)
+                } else Reply()
+            }).use { camera ->
+                val client = PtpIpClient()
+                client.connect("127.0.0.1", camera.port)
+                val output = ByteArrayOutputStream()
+                try {
+                    PtpPhotoDownloader.downloadStream(client, photo(), output, client.captureSessionEpoch()) {}
+                    assertEquals(0x2003, code)
+                    assertArrayEquals(image, output.toByteArray())
+                } catch (failure: Exception) {
+                    if (code == 0x2003) throw failure
+                    assertTrue(if (code == 0x2005) failure is PtpResponseException else failure is PtpDataException)
+                    assertEquals(0, output.size())
+                    assertArrayEquals(image, client.getThumbnail(photo()))
+                }
+                assertEquals(if (code == 0x2003) 2 else 1, reads.get())
+                assertEquals(if (code == 0x2003) 2 else 1, camera.sessions.get())
+                client.disconnect()
+            }
+        }
+    }
+
+    @Test(timeout = 15000) fun exportStopsAfterOneFailedRetryAndWritesNoPartialChunk() = runBlocking {
+        FakeCamera(plan = { op, _, _ -> if (op == 0x923d) Reply(dropSocket = true) else Reply() }).use { camera ->
+            val client = PtpIpClient()
+            client.connect("127.0.0.1", camera.port)
+            val output = ByteArrayOutputStream()
+            try {
+                PtpPhotoDownloader.downloadStream(client, photo(), output, client.captureSessionEpoch()) {}
+                fail("Expected exhausted retry")
+            } catch (_: EOFException) {}
+            assertEquals(0, output.size())
+            assertEquals(2, camera.requests.count { it.first == 0x923d })
+            assertEquals(2, camera.sessions.get())
+            client.disconnect()
+        }
+    }
+
+    @Test(timeout = 15000) fun staleExportEpochCannotReconnectDisconnectedOrReplacementCamera() = runBlocking {
+        FakeCamera().use { oldCamera ->
+            FakeCamera().use { replacement ->
+                val client = PtpIpClient()
+                client.connect("127.0.0.1", oldCamera.port)
+                val epoch = client.captureSessionEpoch()
+                client.disconnect()
+                val output = ByteArrayOutputStream()
+                try {
+                    PtpPhotoDownloader.downloadStream(client, photo(), output, epoch) {}
+                    fail("Stale export reopened disconnected camera")
+                } catch (_: PtpSessionClosedException) {}
+                client.connect("127.0.0.1", replacement.port)
+                try {
+                    PtpPhotoDownloader.downloadStream(client, photo(), output, epoch) {}
+                    fail("Stale export used replacement camera")
+                } catch (_: PtpSessionClosedException) {}
+                assertEquals(0, output.size())
+                assertEquals(listOf(0x9210), oldCamera.requests.map { it.first })
+                assertEquals(listOf(0x9210), replacement.requests.map { it.first })
+                assertArrayEquals(image, client.getThumbnail(photo()))
+                client.disconnect()
+            }
+        }
+    }
+
+    @Test(timeout = 15000) fun disconnectIntentDuringFailedReadPreventsOldExportRecovery() = runBlocking {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        FakeCamera(plan = { op, _, _ ->
+            if (op == 0x923d) {
+                entered.countDown(); check(release.await(5, TimeUnit.SECONDS))
+                Reply(dropSocket = true)
+            } else Reply()
+        }).use { camera ->
+            val client = PtpIpClient()
+            client.connect("127.0.0.1", camera.port)
+            val epoch = client.captureSessionEpoch()
+            val output = ByteArrayOutputStream()
+            val export = async(Dispatchers.IO) {
+                try {
+                    PtpPhotoDownloader.downloadStream(client, photo(), output, epoch) {}
+                    false
+                } catch (_: PtpSessionClosedException) { true }
+            }
+            check(entered.await(5, TimeUnit.SECONDS))
+            // UNDISPATCHED publishes the disconnect epoch before waiting for accepted I/O.
+            val disconnect = async(start = CoroutineStart.UNDISPATCHED) { client.disconnect() }
+            release.countDown()
+            assertTrue(export.await())
+            disconnect.await()
+            assertEquals(0, output.size())
+            assertEquals(1, camera.sessions.get())
+            assertEquals(1, camera.requests.count { it.first == 0x923d })
+        }
+    }
+
+    @Test(timeout = 15000) fun cancelledAcceptedReadThatCannotSettleClosesAtTransactionDeadlineAndExportRecovers() = runBlocking {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        FakeCamera(plan = { op, params, _ ->
+            if (op == 0x923e && params.last() == 2L) Reply(beforeResponse = {
+                entered.countDown(); check(release.await(5, TimeUnit.SECONDS))
+            }) else Reply()
+        }).use { camera ->
+            // Internal test-only timings: production remains 15s socket / 30s transaction.
+            val client = PtpIpClient(socketTimeoutMillis = 5000, transactionTimeoutMillis = 1000)
+            client.connect("127.0.0.1", camera.port)
+            val preview = async(Dispatchers.IO) { client.getPreview(photo()) }
+            check(entered.await(5, TimeUnit.SECONDS))
+            preview.cancel()
+            preview.join() // Must finish without releasing the camera's final response.
+            assertTrue(client.lastSessionFailure is java.net.SocketTimeoutException)
+            release.countDown()
+            val output = ByteArrayOutputStream()
+            PtpPhotoDownloader.downloadStream(client, photo(), output, client.captureSessionEpoch()) {}
+            assertArrayEquals(image, output.toByteArray())
+            assertEquals(2, camera.sessions.get())
+            assertEquals(1, camera.requests.count { it.first == 0x923e })
+            client.disconnect()
+        }
+    }
+
+    @Test(timeout = 15000) fun pinnedPreviewCannotReadOrReconnectReplacementCamera() = runBlocking {
+        FakeCamera().use { original ->
+            FakeCamera().use { replacement ->
+                val client = PtpIpClient()
+                client.connect("127.0.0.1", original.port)
+                val epoch = client.captureSessionEpoch()
+                client.connect("127.0.0.1", replacement.port)
+                try { client.getPreview(photo(), epoch); fail("Stale preview must be rejected") }
+                catch (_: PtpSessionClosedException) {}
+                try { client.reconnectIfNeeded(epoch); fail("Stale preview must not reconnect") }
+                catch (_: PtpSessionClosedException) {}
+                assertEquals(0, original.requests.count { it.first == 0x923e })
+                assertEquals(0, replacement.requests.count { it.first == 0x923e })
+                assertArrayEquals(image, client.getPreview(photo(), client.captureSessionEpoch()))
+                assertEquals(1, replacement.requests.count { it.first == 0x923e })
+                client.disconnect()
+            }
         }
     }
 
@@ -281,7 +518,8 @@ class CameraPreviewProtocolTest {
     private data class Reply(
         val announced: Long = 4, val bytes: Int = 4, val code: Int = 0x2001,
         val dataIdOffset: Int = 0, val responseIdOffset: Int = 0,
-        val dropSocket: Boolean = false, val malformedLength: Boolean = false, val payload: ByteArray? = null
+        val dropSocket: Boolean = false, val malformedLength: Boolean = false, val payload: ByteArray? = null,
+        val dropAfterData: Boolean = false, val beforeResponse: (() -> Unit)? = null
     )
 
     private class FakeCamera(
@@ -333,7 +571,7 @@ class CameraPreviewProtocolTest {
                     check(read(input).first == 9)
                     check(read(input).first == 12)
                 }
-                val isRead = op == 0x923e || op == 0x923d || op == 0x923c || op == 0x1004
+                val isRead = op == 0x923e || op == 0x923d || op == 0x9211 || op == 0x923c || op == 0x1004
                 if (isRead) reads++
                 val reply = plan(op, params, reads)
                 if (reply.dropSocket && op != 0x9210) { cmd.close(); return }
@@ -354,6 +592,8 @@ class CameraPreviewProtocolTest {
                     val data = reply.payload ?: ByteArray(reply.bytes) { image[it % image.size] }
                     send(cmd.getOutputStream(), 12, buffer(4 + data.size).putInt(id + reply.dataIdOffset).put(data).array())
                 }
+                if (reply.dropAfterData) { cmd.close(); return }
+                reply.beforeResponse?.invoke()
                 send(cmd.getOutputStream(), 7, buffer(6).putShort(reply.code.toShort()).putInt(id + reply.responseIdOffset).array())
             }
         }

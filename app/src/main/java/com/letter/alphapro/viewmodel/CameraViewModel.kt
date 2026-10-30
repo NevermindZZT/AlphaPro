@@ -100,23 +100,45 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     private val _remoteShooting = MutableStateFlow(RemoteShootingUiState())
     val remoteShooting = _remoteShooting.asStateFlow()
 
-    private val photoLoader = com.letter.alphapro.ui.gallery.CameraPhotoLoader(ptpClient, viewModelScope)
+    val selectedGroupIds = androidx.compose.runtime.mutableStateListOf<String>()
+
+    private val photoLoader = com.letter.alphapro.ui.gallery.CameraPhotoLoader(ptpClient, viewModelScope, application.cacheDir)
     val thumbnails = photoLoader.thumbnails
     val photoPreview = photoLoader.preview
     val thumbnailErrors = photoLoader.thumbnailErrors
     private val _viewingPhoto = MutableStateFlow<com.letter.alphapro.core.ptp.CameraCaptureGroup?>(null)
     val viewingPhoto = _viewingPhoto.asStateFlow()
-    fun openPhoto(group: com.letter.alphapro.core.ptp.CameraCaptureGroup) {
+    private val _viewingPhotos = MutableStateFlow<List<com.letter.alphapro.core.ptp.CameraCaptureGroup>>(emptyList())
+    val viewingPhotos = _viewingPhotos.asStateFlow()
+    private val _viewingIndex = MutableStateFlow(0)
+    val viewingIndex = _viewingIndex.asStateFlow()
+
+    fun openPhoto(group: com.letter.alphapro.core.ptp.CameraCaptureGroup, allGroups: List<com.letter.alphapro.core.ptp.CameraCaptureGroup> = listOf(group)) {
+        _viewingPhotos.value = allGroups
+        val index = allGroups.indexOfFirst { it.id == group.id }.coerceAtLeast(0)
+        _viewingIndex.value = index
         _viewingPhoto.value = group
         photoLoader.showPreview(group.visualFile)
     }
+
+    fun setViewingIndex(index: Int) {
+        val photos = _viewingPhotos.value
+        if (index in photos.indices) {
+            _viewingIndex.value = index
+            val group = photos[index]
+            _viewingPhoto.value = group
+            photoLoader.showPreview(group.visualFile)
+        }
+    }
+
     fun closePhoto() {
         _viewingPhoto.value = null
+        _viewingPhotos.value = emptyList()
         photoLoader.clearPreview()
     }
-    fun retryThumbnail(metadata: PtpImageMetadata) = photoLoader.retryThumbnail(metadata)
+    fun retryThumbnail(metadata: PtpImageMetadata, alternate: PtpImageMetadata? = null) = photoLoader.retryThumbnail(metadata, alternate)
     fun releaseThumbnailRequest(handle: Long) = photoLoader.releaseThumbnailRequest(handle)
-    fun requestThumbnail(metadata: PtpImageMetadata) = photoLoader.requestThumbnail(metadata)
+    fun requestThumbnail(metadata: PtpImageMetadata, alternate: PtpImageMetadata? = null) = photoLoader.requestThumbnail(metadata, alternate)
     fun requestPhotoPreview(metadata: PtpImageMetadata) = photoLoader.showPreview(metadata)
     fun clearPhotoPreview() = photoLoader.clearPreview()
 
@@ -368,8 +390,8 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         jpegQuality: Int = 95
     ) {
         viewModelScope.launch {
-            _uiState.update { it.copy(userNotice = text(R.string.runtime_export_starting, metadata.filename)) }
             try {
+                photoLoader.stopPreviewForExport()
                 if (transcodeToJpeg && metadata.isHeif) {
                     com.letter.alphapro.core.heif.HeifDecoder.requireAvailable()
                     heifExportMutex.withLock {
@@ -396,7 +418,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                             map[metadata.filename] = progress.bytesDownloaded.toFloat() / progress.totalBytes.toFloat()
                             current.copy(
                                 downloadProgressMap = map,
-                                userNotice = if (progress.isComplete) text(R.string.runtime_export_complete, metadata.filename) else text(R.string.runtime_export_progress, metadata.filename)
+                                userNotice = if (progress.isComplete) text(R.string.runtime_export_complete, metadata.filename) else current.userNotice
                             )
                         }
                     }

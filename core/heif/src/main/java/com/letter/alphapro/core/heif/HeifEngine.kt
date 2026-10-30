@@ -25,11 +25,15 @@ object HeifDecoder {
     fun decodeFile(path: String, memoryBudget: Long, cancelled: BooleanSupplier? = null): Bitmap =
         runtime.call { nativeDecodeFile(path, memoryBudget, cancelled) }
 
-    fun decodeThumbnail(encoded: ByteArray, memoryBudget: Long): Bitmap =
-        runtime.call { nativeDecodeThumbnail(encoded, memoryBudget) }
+    fun decodeThumbnail(encoded: ByteArray, memoryBudget: Long, cancelled: BooleanSupplier? = null): Bitmap =
+        runtime.call { nativeDecodeThumbnail(encoded, memoryBudget, cancelled) }
 
-    fun decodePreview(encoded: ByteArray, memoryBudget: Long): Bitmap =
-        runtime.call { nativeDecodePreview(encoded, memoryBudget) }
+    fun decodePreview(encoded: ByteArray, memoryBudget: Long, cancelled: BooleanSupplier? = null): Bitmap =
+        runtime.call { nativeDecodePreview(encoded, memoryBudget, cancelled) }
+
+    /** Decode from app-owned storage, returning at most a 2048px edge (not a full-size export). */
+    fun decodeFilePreview(path: String, memoryBudget: Long, cancelled: BooleanSupplier? = null): Bitmap =
+        runtime.call { nativeDecodeFilePreview(path, memoryBudget, cancelled) }
 
     fun readExif(path: String): ByteArray = runtime.call { nativeReadExif(path) }
 
@@ -37,10 +41,13 @@ object HeifDecoder {
     private external fun nativeDecodeFile(path: String, memoryBudget: Long, cancelled: BooleanSupplier?): Bitmap
 
     @JvmStatic
-    private external fun nativeDecodeThumbnail(encoded: ByteArray, memoryBudget: Long): Bitmap
+    private external fun nativeDecodeThumbnail(encoded: ByteArray, memoryBudget: Long, cancelled: BooleanSupplier?): Bitmap
 
     @JvmStatic
-    private external fun nativeDecodePreview(encoded: ByteArray, memoryBudget: Long): Bitmap
+    private external fun nativeDecodePreview(encoded: ByteArray, memoryBudget: Long, cancelled: BooleanSupplier?): Bitmap
+
+    @JvmStatic
+    private external fun nativeDecodeFilePreview(path: String, memoryBudget: Long, cancelled: BooleanSupplier?): Bitmap
 
     @JvmStatic
     private external fun nativeReadExif(path: String): ByteArray

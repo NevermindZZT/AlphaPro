@@ -12,4 +12,9 @@
     <string name="preview_failed">Unable to load preview: %1$s</string>
     <string name="preview_original_limit">A large preview is unavailable, or the original exceeds the safe preview limit. Please export it manually.</string>
     <string name="preview_original_incomplete">The original preview data is incomplete.</string>
+    <string name="preview_camera_system_source">Camera preview (system decode) · %1$d × %2$d</string>
+    <string name="preview_camera_software_source">Camera preview (software decode) · %1$d × %2$d</string>
+    <string name="preview_original_system_source">Temporary original preview (system decode, no export) · %1$d × %2$d</string>
+    <string name="preview_original_software_source">Temporary original preview (software decode, no export) · %1$d × %2$d</string>
+    <string name="preview_thumbnail_attempts">Thumbnail/preview requests only; no JPEG export. Details by source and stage:\n%1$s</string>
 </resources>

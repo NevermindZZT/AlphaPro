@@ -21,6 +21,8 @@
     <string name="gallery_collapse_date">折叠日期分组</string>
     <string name="gallery_photo_description">照片：%1$s</string>
     <string name="gallery_retry_thumbnail">重试缩略图</string>
+    <string name="gallery_thumbnail_error_details">查看缩略图错误详情</string>
+    <string name="gallery_thumbnail_error_title">缩略图错误 · %1$s</string>
     <string name="gallery_select_photo">选择照片：%1$s</string>
     <string name="gallery_deselect_photo">取消选择照片：%1$s</string>
     <string name="gallery_viewer_title">照片查看器</string>
@@ -52,6 +54,9 @@
     <string name="gallery_badge_edit">专业后期</string>
     <string name="gallery_download_both">同时下载 RAW + %1$s</string>
     <string name="gallery_download_both_description">总大小约 %1$s · 双格式归档到相册</string>
+    <string name="gallery_download_current">下载当前</string>
+    <string name="gallery_download_selected">一键下载已选（%1$d）</string>
+    <string name="gallery_viewer_photo_title">%1$s（%2$d/%3$d）</string>
     <string name="gallery_badge_save_all">全部保存</string>
     <string name="gallery_transcode_quality">转码为通用 JPEG（%1$s 品质）</string>
     <string name="gallery_transcode_description">保留拍摄参数并兼容所有相册</string>
